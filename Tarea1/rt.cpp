@@ -154,7 +154,7 @@ inline bool intersect(const Ray &r, double &t, int &id) {
     };
 
 	for (int i=0;i<NS;i++){
-		if ( t>aux[i] && aux[i]>1. ){
+		if ( t>aux[i] && aux[i]>1.0 ){
 			t= aux[i];
 			id=i;
 		};
