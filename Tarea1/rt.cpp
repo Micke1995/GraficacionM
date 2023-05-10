@@ -6,7 +6,6 @@
 #include <omp.h>
 #include <stdio.h>
 #include <time.h>       // for clock_t, clock(), CLOCKS_PER_SEC
-#define NUM_THREADS 4
 #include <cstdlib>
 
 
@@ -46,6 +45,14 @@ public:
 	
 	// normalizar vector 
 	Vector& normalize(){ return *this = *this * (1.0 / sqrt(x * x + y * y + z * z)); }
+
+	double magnitud() const {
+        return sqrt(magnitud2());
+        }
+
+    double magnitud2() const {
+        return x*x + y*y + z*z;
+        }
 
 };
 
@@ -103,7 +110,12 @@ public:
 			return 0.0;
 		}
 		else{
-			return (-b-sqrt(discriminant)/a);
+			double tpositivo = -b + sqrt(discriminant);
+			double tnegativo = -b - sqrt(discriminant);
+			double t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+
+			if (t < 0) return 0;
+			else return t;
 		}
 	}
 };
@@ -154,7 +166,7 @@ inline bool intersect(const Ray &r, double &t, int &id) {
     };
 
 	for (int i=0;i<NS;i++){
-		if ( t>aux[i] && aux[i]>1.0 ){
+		if ( t>aux[i] && aux[i]>0.0001 ){
 			t= aux[i];
 			id=i;
 		};
@@ -166,22 +178,36 @@ inline bool intersect(const Ray &r, double &t, int &id) {
 
 	return false;
 }
+void normalizat(double &t,const double &min,const double &max){
+	t=(t-min)/(max-min);
+}
 
 // Calcula el valor de color para el rayo dado
+//Color shade(const Ray &r,double &min,double &max) {//Use este Shade para encontrar el minimo y el maximo de la escena.
 Color shade(const Ray &r) {
 	double t;
-	double h;
 	int id = 0;
+
+	double min=144.676098;
+	//double min=0.0;
+	double max=304.110891;
 	// determinar que esfera (id) y a que distancia (t) el rayo intersecta
 	if (!intersect(r, t, id)){
 		return Color();}	// el rayo no intersecto objeto, return Vector() == negro
 
 	const Sphere &obj = spheres[id];
-	
+
+	/*if (t<min)
+		min=t;   //Lineas de codigo para calcular el minimo y maximo
+	if (t>max)
+		max=t; */
+
 	// PROYECTO 1
 	// determinar coordenadas del punto de interseccion
 	Point x; //Linea de codigo para el calculo de las coordenadas 
 	x=r.d*t+r.o;
+	normalizat(t,min,max);
+	//printf("%f,",t);
 	//h=sqrt(x.x*x.x+x.y*x.y+x.z*x.z)/103.5; //esta linea no se utilizo
 	
 	// determinar la dirección normal en el punto de interseccion
@@ -193,11 +219,12 @@ Color shade(const Ray &r) {
 	//Color colorvalue(obj.c+n);// Para pintar las esferas de acuerdo a la normal en su punto intersectado
 
 	//Imagen.jpg Es necesario descomentar la siguiente linea de codigo para obtener lo equivalente a esta imangen.
-	Color colorvalue(obj.c);// Para pintar las esferas de acuerdo a su color 
+	//Color colorvalue(obj.c);// Para pintar las esferas de acuerdo a su color 
 
 	//Imagen3.jpg Es necesario descomentar la siguiente linea de codigo para obtener lo equivalente a esta imangen.
 	//Color colorvalue((1/310.0)*t,(1/310.0)*t,(1/310.0)*t); //Para pintarlo deacuerdo a la distancia
-
+	Color colorvalue(t,t,t);
+	//printf("%f,\t,%f\n",t,x.magnitud());
 	//Posible variante para la Imagen3.jpg
 	//Color colorvalue(1*h,1*h,1*h);//Para pintarlo deacuerdo a la distancia, es redundante y no funciona bien, hay que descomentar h para probarlo
 
@@ -207,9 +234,10 @@ Color shade(const Ray &r) {
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
- 
+	//double min=144.676098;
+	//double min=0.0;
+	//double max=304.110891;
     clock_t begin = clock();
-	//sleep(3);
  
 	int w = 1024, h = 768; // image resolution
   
@@ -225,9 +253,10 @@ int main(int argc, char *argv[]) {
 
 	// PROYECTO 1
 	// usar openmp para paralelizar el ciclo: cada hilo computara un renglon (ciclo interior),
-
+	int NUM_THREADS=omp_get_max_threads();
+	fprintf(stderr," \r Vamos a trabajar con %d hilos ",NUM_THREADS);
 	omp_set_num_threads(NUM_THREADS); //Lineas de Codigo para paralelizar
-	#pragma omp parallel for //schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
+	#pragma omp parallel for schedule(dynamic,10)//schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
 
 	for(int y = 0; y < h; y++) 
 	{ 
@@ -243,7 +272,8 @@ int main(int argc, char *argv[]) {
 			Vector cameraRayDir = cx * ( double(x)/w - .5) + cy * ( double(y)/h - .5) + camera.d;
 			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 
-			pixelValue = shade( Ray(camera.o, cameraRayDir.normalize()) );
+			pixelValue = shade( Ray(camera.o, cameraRayDir.normalize()));
+			//pixelValue = shade( Ray(camera.o, cameraRayDir.normalize()),min,max );//Use este min max para encontrar el min y maximo de la escena
 			// limitar los tres valores de color del pixel a [0,1] 
 			pixelColors[idx] = Color(clamp(pixelValue.x), clamp(pixelValue.y), clamp(pixelValue.z));
 		}
@@ -258,11 +288,12 @@ int main(int argc, char *argv[]) {
 
 	time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
  
-    printf("The elapsed time is %f seconds", time_spent);
+    printf("The elapsed time is %f seconds \n", time_spent);
+	//printf("El minimo t para la escena  %f es y el maximo es t para la escena es %f",min,max);
 
 	// PROYECTO 1
 	// Investigar formato ppm
-	FILE *f = fopen("image.ppm", "w");
+	FILE *f = fopen("distancia2.ppm", "w");
 	// escribe cabecera del archivo ppm, ancho, alto y valor maximo de color
 	fprintf(f, "P3\n%d %d\n%d\n", w, h, 255); 
 	for (int p = 0; p < w * h; p++) 

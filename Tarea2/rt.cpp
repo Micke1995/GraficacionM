@@ -282,10 +282,10 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 	Vector s; //Utilizamos estos 3 vectores para construir nuestras coordenadas locales
 	Vector ti;
 	coordinateSystem(n,s,ti);
-	Point re=random_esfera(); //Descomentamos unicamente para muestro esferico (comentar las demas re)
+	//Point re=random_esfera(); //Descomentamos unicamente para muestro esferico (comentar las demas re)
 	//Point re=random_hemisferio(); //Descomentamos unicamente para muestro hemisferio (comentar las demas re)
-	//double theta;//Descomentamos unicamente para muestro  coseno hemisferico
-	//Point re=random_coseno(theta);//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
+	double theta;//Descomentamos unicamente para muestro  coseno hemisferico
+	Point re=random_coseno(theta);//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
 
 	//re era random en la esfera pero por siplicidad se los deje a todos.
 	//Point dir(re.dot(Point(s.x,ti.x,n.x)),re.dot(Point(s.y,ti.y,n.y)),re.dot(Point(s.z,ti.z,n.z)));
@@ -300,9 +300,9 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 						 // Si es Verdadero hace la estimacion Monte Carlo que viene Abajo.
 
 	double Coseno=n.dot(dir);//
-    return emite + attenuation.mult(shade(rebota, prof-1))*((4.0*pi)*Coseno); //Descomentamos unicamente para muestro esferico (comentar las demas re)
+    //return emite + attenuation.mult(shade(rebota, prof-1))*((1/4.0*pi)*Coseno); //Descomentamos unicamente para muestro esferico (comentar las demas re)
 	//return emite + attenuation.mult(shade(rebota, prof-1))*(1.0/(2.0*pi))*Coseno;//Descomentamos unicamente para muestro hemisferio (comentar las demas re)
-	//return  attenuation.mult(shade(rebota, prof-1))*(1.0/pi*cos(theta))*Coseno;//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
+	return  attenuation.mult(shade(rebota, prof-1))*(1.0/pi*cos(theta))*(Coseno);//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
 }
 
 

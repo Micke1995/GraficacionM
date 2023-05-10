@@ -6,7 +6,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <time.h>       // for clock_t, clock(), CLOCKS_PER_SEC
-#define NUM_THREADS 8
+//#define NUM_THREADS 8
 #include <cstdlib>
 
 auto pi=3.1416;
@@ -284,7 +284,8 @@ int main(int argc, char *argv[]) {
 
 	// PROYECTO 1
 	// usar openmp para paralelizar el ciclo: cada hilo computara un renglon (ciclo interior),
-
+	int NUM_THREADS=omp_get_num_threads();
+	fprintf(stderr,"\r Vamos a trabajar con %5.2f%% hilos ",NUM_THREADS);
 	omp_set_num_threads(NUM_THREADS); //Lineas de Codigo para paralelizar
 	#pragma omp parallel for //schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
 

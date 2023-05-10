@@ -82,7 +82,7 @@ void coordinateSystem(const Vector &n, Vector &s, Vector &t) { //Esta es la func
 	s = cross(t, n);
 	}
 
-inline Vector random_esfera(double &ro) { //Esta funcion crea direcciones aleatorias esfericas.
+inline Vector random_esfera(double ro=1.0) { //Esta funcion crea direcciones aleatorias esfericas.
     auto r1 = random_double();
     auto r2 = random_double();
 
@@ -206,7 +206,7 @@ public:
 	}
 };
 
-Luz  Esferaluminoza(Color(10, 10, 10));
+Luz  Esferaluminoza(Color(3, 3, 3));
 Abedo ParIzq(Color(.75, .25, .25));
 Abedo ParDer(Color(.25, .25, .75));
 Abedo ParedAt(Color(.25, .75, .25));
@@ -294,7 +294,7 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 	//Vector s; //Utilizamos estos 3 vectores para construir nuestras coordenadas locales
 	//Vector ti;
 	//coordinateSystem(n,s,ti);
-	double ro=10.5;
+	double ro=21.0;
 	Point re=random_esfera(ro); 
 	Vector luz(0, 24.3,0);
 	Vector n=(re-luz).normalize();
@@ -303,28 +303,22 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 	coordinateSystem(n,s,ti);
 
 	Point dir(re.dot(Point(s.x,ti.x,n.x)),re.dot(Point(s.y,ti.y,n.y)),re.dot(Point(s.z,ti.z,n.z)));
-	double Distancia=(dir-x).magnitud();
+	dir=dir-x;
+
+	double Distancia=(dir-x).magnitud2();
+	double cosenoluz=fabs(dir.dot(x)/(x.magnitud(),dir.magnitud()));
 
     Ray rebota(x,dir.normalize());
     Color attenuation;
     Color emite = obj.m->Emite(x);
 
-	if (dir.dot(n2)<0)
-		return Color();
 	double Coseno=n2.dot(dir);
-	double cosenoluz = fabs(dir.y);
 
-    if (cosenoluz < 0.000001)
-        return Color();	
-
-    if (!obj.m->Rebota(r, attenuation)) //Si el rayo es un emisor Rebota te regresa Falso, por lo que ste if se vuelve True
-        return emite;    // y te regresa directamente la luz
-						 // Si es Verdadero hace la estimacion Monte Carlo que viene Abajo.
-	double pdf=Distancia/(cosenoluz*4*pi);					 
-
-    return emite + attenuation.mult(shade(rebota, prof-1))*(Coseno/pdf); //Descomentamos unicamente para muestro esferico (comentar las demas re)
-	//return emite + attenuation.mult(shade(rebota, prof-1))*(1.0/(2.0*pi))*Coseno;//Descomentamos unicamente para muestro hemisferio (comentar las demas re)
-	//return  attenuation.mult(shade(rebota, prof-1))*(1.0/pi*cos(theta))*Coseno;//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
+    if (!obj.m->Rebota(r, attenuation)) 
+        return emite;   						 
+	double pdf=Distancia/(2.0*pi*cosenoluz*10.5);
+	//double pdf=1;					 
+    return attenuation.mult(shade(rebota, prof-1))*(Coseno/pdf); 
 }
 
 
@@ -402,3 +396,17 @@ int main(int argc, char *argv[]) {
 
 	return 0;
 }
+
+
+/*Borrado del codigo rtas.cpp
+	Vector n2=(re-luz).normalize();
+	Vector s; 
+	Vector ti;
+	coordinateSystem(n2,s,ti);
+
+	Point dir(re.dot(Point(s.x,ti.x,n2.x)),re.dot(Point(s.y,ti.y,n2.y)),re.dot(Point(s.z,ti.z,n2.z)));
+	dir=dir-x;
+
+	double Distancia=dir.magnitud2();
+	double cosenoluz=fabs(dir.dot(x)/(x.magnitud(),dir.magnitud()));
+*/

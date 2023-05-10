@@ -305,8 +305,7 @@ Color shade(const Ray &r,int prof) {
 	if(id==id2){//Si la esfera que tocamos la primera vez es igual a la esfera que tocamos la segunda vez regresamos color si no no regresamos nada
 		const Sphere &obj2 = spheres[id2];
 		Point x2=rebota.d*ta+rebota.o;
-		Vector DirLuz2=luz-x2;
-		dist=DirLuz2.magnitud();
+		dist=(luz-x2).magnitud();
 		}else
 			return Color();
 
