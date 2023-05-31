@@ -6,7 +6,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <time.h>       // for clock_t, clock(), CLOCKS_PER_SEC
-#define NUM_THREADS 4
+//#define NUM_THREADS 4
 #include <cstdlib>
 
 double pi=3.14159265358979323846; //Creamos el valor de pi para facilitarnos varais cosas.
@@ -82,17 +82,30 @@ void coordinateSystem(const Vector &n, Vector &s, Vector &t) { //Esta es la func
 	s = cross(t, n);
 	}
 
-inline Vector random_esfera(double ro=1.0) { //Esta funcion crea direcciones aleatorias esfericas.
+inline Vector random_esfera2(double ro=1.0) { //Esta funcion crea direcciones aleatorias esfericas.
     auto r1 = random_double();
     auto r2 = random_double();
 
-    auto x = ro*cos(2*pi*r1)*2*sqrt(r2*(1-r2));
-    auto y = ro*sin(2*pi*r1)*2*sqrt(r2*(1-r2));
-    auto z = ro*(1 - 2*r2);
+    auto x = ro*cos(2.0*pi*r1)*2.0*sqrt(r2*(1.0-r2));
+    auto y = ro*sin(2.0*pi*r1)*2.0*sqrt(r2*(1.0-r2));
+    auto z = ro*(1.0 - 2.0*r2);
 
     return Vector(x, y, z);
 }
 
+inline Vector random_esfera(double ro=10.5) { //Esta funcion crea direcciones aleatorias esfericas.
+    double r1 = random_double();
+    double r2 = random_double();
+
+    double theta = acos(1.0 - 2.0 * r1);
+    double phi = 2.0 * pi * r2;
+
+	double x = ro * sin(theta) * cos(phi);
+    double y = ro * sin(theta) * sin(phi);
+    double z = ro * cos(theta);
+
+    return Vector(x, y, z);
+}
 
 inline Vector random_hemisferio() {//Esta funcion crea direcciones aleatorias en un hemisferio.
     auto r1 = random_double();
@@ -112,9 +125,9 @@ inline Vector random_coseno(double &theta) {//Esta funcion crea direcciones alea
     auto r1 = random_double();
     auto r2 = random_double();
 
-    auto phi = 2*pi*r1;
+    auto phi = 2.0*pi*r1;
 
-    auto z = sqrt(1-r2);
+    auto z = sqrt(1.0-r2);
     auto x = cos(phi)*sqrt(r2);
     auto y = sin(phi)*sqrt(r2);
 
@@ -196,17 +209,18 @@ public:
 		if (discriminant<0) {
 			return 0.0;
 		}
-		else{			
-			double t0 = -b + sqrt(disc);
-			double t1 = -b - sqrt(disc);
-			double t = (t0 < t1) ? t0 : t1;
+		else{
+			double tpositivo = -b + sqrt(discriminant);
+			double tnegativo = -b - sqrt(discriminant);
+			double t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+
 			if (t < 0) return 0;
 			else return t;
 		}
 	}
 };
 
-Luz  Esferaluminoza(Color(3, 3, 3));
+Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
 Abedo ParIzq(Color(.75, .25, .25));
 Abedo ParDer(Color(.25, .25, .75));
 Abedo ParedAt(Color(.25, .75, .25));
@@ -290,36 +304,44 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 	// PROYECTO 2
 	Point x=r.d*t+r.o; //Linea de codigo para el calculo de las coordenadas
 	// determinar la dirección normal en el punto de interseccion
-	Vector n2=(x-obj.p).normalize();
-	//Vector s; //Utilizamos estos 3 vectores para construir nuestras coordenadas locales
-	//Vector ti;
-	//coordinateSystem(n,s,ti);
-	double ro=21.0;
-	Point re=random_esfera(ro); 
+	Vector n=(x-obj.p).normalize();
+	double radio=10.5; 
 	Vector luz(0, 24.3,0);
-	Vector n=(re-luz).normalize();
-	Vector s; 
-	Vector ti;
-	coordinateSystem(n,s,ti);
 
-	Point dir(re.dot(Point(s.x,ti.x,n.x)),re.dot(Point(s.y,ti.y,n.y)),re.dot(Point(s.z,ti.z,n.z)));
-	dir=dir-x;
+    Vector dir=luz+random_esfera2(radio);
 
-	double Distancia=(dir-x).magnitud2();
-	double cosenoluz=fabs(dir.dot(x)/(x.magnitud(),dir.magnitud()));
+	Vector n2=(dir-luz).normalize();
+	Vector dirn=(x-dir).normalize();
+	dir=dir-x;	
 
+	double Distancia=(dir).magnitud2();
+	double cosenoluz=dirn.dot(n2);
+
+	
     Ray rebota(x,dir.normalize());
+
     Color attenuation;
     Color emite = obj.m->Emite(x);
 
-	double Coseno=n2.dot(dir);
+	double Coseno=n.dot(dir);
+	if (Coseno  < 0)
+        return emite;
 
-    if (!obj.m->Rebota(r, attenuation)) 
-        return emite;   						 
-	double pdf=Distancia/(2.0*pi*cosenoluz*10.5);
-	//double pdf=1;					 
-    return attenuation.mult(shade(rebota, prof-1))*(Coseno/pdf); 
+    if (!obj.m->Rebota(r, attenuation)||cosenoluz<0.001){ //
+			return emite;
+		} 
+
+
+	double pdf=Distancia/(4.0*pi*radio*radio*cosenoluz);
+					 
+    return emite + attenuation.mult(shade(rebota, prof-1))*(Coseno/pdf); 
 }
+
+
+
+
+
+
 
 
 int main(int argc, char *argv[]) {
@@ -341,8 +363,10 @@ int main(int argc, char *argv[]) {
 	// auxiliar para valor de pixel y matriz para almacenar la imagen
 	Color *pixelColors = new Color[w * h];
 
+	int NUM_THREADS=omp_get_max_threads();
+	fprintf(stderr," \r Vamos a trabajar con %d hilos ",NUM_THREADS);
 	omp_set_num_threads(NUM_THREADS); //Lineas de Codigo para paralelizar
-	#pragma omp parallel for //schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
+	#pragma omp parallel for
 
 	for(int y = 0; y < h; y++) 
 	{ 
@@ -360,7 +384,7 @@ int main(int argc, char *argv[]) {
 			Vector cameraRayDir = cx * ( double(x)/w - .5) + cy * ( double(y)/h - .5) + camera.d;
 			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 
-			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) ,prof);
+			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) ,prof)*(1.0/muestras);
 			// limitar los tres valores de color del pixel a [0,1] 
 			}
 			//pixelValue = pixelValue;

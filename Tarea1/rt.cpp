@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <time.h>       // for clock_t, clock(), CLOCKS_PER_SEC
 #include <cstdlib>
-
+#include <algorithm>
 
 inline double random_double() {
     // Returns a random real in [0,1).
@@ -112,9 +112,12 @@ public:
 		else{
 			double tpositivo = -b + sqrt(discriminant);
 			double tnegativo = -b - sqrt(discriminant);
-			double t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
-
-			if (t < 0) return 0;
+			double t;
+			if (tpositivo > 0.0 && tnegativo > 0.0 )
+			t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+			else 
+			t = (tpositivo > tnegativo) ? tpositivo : tnegativo;
+			if (t < 0.0) return 0.0;
 			else return t;
 		}
 	}

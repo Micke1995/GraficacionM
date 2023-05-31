@@ -4,7 +4,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <time.h>       
-#define NUM_THREADS 4
+//#define NUM_THREADS 4
 #include <cstdlib>
 
 double pi=3.14159265358979323846; //Creamos el valor de pi para facilitarnos varias cosas.
@@ -185,14 +185,15 @@ public:
 		auto a = ray.d.magnitud2();
 		auto b =  oc.dot(ray.d);
 		auto c = oc.magnitud2()-r*r;
-		auto disc= b*b - a*c;
+		auto discriminant= b*b - a*c;
 
 		//double disc = b*b - ce;
-		if (disc < 0) return 0.0;
-		else {
-			double t0 = -b + sqrt(disc);
-			double t1 = -b - sqrt(disc);
-			double t = (t0 < t1) ? t0 : t1;
+		if (discriminant < 0) return 0.0;
+		else{
+			double tpositivo = -b + sqrt(discriminant);
+			double tnegativo = -b - sqrt(discriminant);
+			double t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+
 			if (t < 0) return 0;
 			else return t;
 		}
@@ -287,11 +288,11 @@ Color shade(const Ray &r,int prof) {
 	Point luz(0, 24.3,0);// Creamos la fuente puntual, en este caso es la direccion a la que vamos a muestrear, como este punto ya esta en coordenadas
 
     Color attenuation;
-	Vector x1=(x-luz).normalize(); //Creamos la direccion en la que va nuestra el rayo de luz, en la ecuacion Le(x',-wi) x'
+	Vector x1=(x-luz); //Creamos la direccion en la que va nuestra el rayo de luz, en la ecuacion Le(x',-wi) x'
 	Ray rebota(luz,x1); 
 
 	obj.m->Rebota(rebota,attenuation);
-	Color emite(10,10,10);
+	Color emite(4000,4000,4000);
 
 	double Coseno=n.dot(x1);
 
@@ -309,7 +310,7 @@ Color shade(const Ray &r,int prof) {
 		}else
 			return Color();
 
-	return attenuation*emite*(-Coseno)*4*pi*(1.0/dist);	
+	return attenuation*emite*(-Coseno)*(1.0/dist);	
     
 
 }
@@ -334,8 +335,10 @@ int main(int argc, char *argv[]) {
 	// auxiliar para valor de pixel y matriz para almacenar la imagen
 	Color *pixelColors = new Color[w * h];
 
+	int NUM_THREADS=omp_get_max_threads();
+	fprintf(stderr," \r Vamos a trabajar con %d hilos ",NUM_THREADS);
 	omp_set_num_threads(NUM_THREADS); //Lineas de Codigo para paralelizar
-	#pragma omp parallel for //schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
+	#pragma omp parallel for
 
 	for(int y = 0; y < h; y++) 
 	{ 

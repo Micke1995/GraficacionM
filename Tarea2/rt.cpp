@@ -6,7 +6,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <time.h>       // for clock_t, clock(), CLOCKS_PER_SEC
-#define NUM_THREADS 4
+//#define NUM_THREADS 12
 #include <cstdlib>
 
 double pi=3.14159265358979323846; //Creamos el valor de pi para facilitarnos varais cosas.
@@ -79,38 +79,42 @@ inline Vector random_esfera() { //Esta funcion crea direcciones aleatorias esfer
     auto r1 = random_double();
     auto r2 = random_double();
 
-    auto x = cos(2*pi*r1)*2*sqrt(r2*(1-r2));
-    auto y = sin(2*pi*r1)*2*sqrt(r2*(1-r2));
-    auto z = 1 - 2*r2;
+	double theta=acos(1.0-2.0*r1);
+	double phi=2.0*pi*r2;
+
+    auto x = cos(phi)*sin(theta);
+    auto y = sin(phi)*sin(theta);
+    auto z = 1.0 - 2.0*r1;
 
     return Vector(x, y, z);
 }
 
 
 inline Vector random_hemisferio() {//Esta funcion crea direcciones aleatorias en un hemisferio.
-    auto r1 = random_double();
-    auto r2 = random_double();
+    double r1 = random_double();
+    double r2 = random_double();
 
-    auto theta=acos(1-r1);
-    auto phi=2*pi*r2;
+    double theta=acos(r1);
+    double phi=2.0*pi*r2;
 
-    auto x = sin(theta)*cos(phi);
-    auto y = sin(theta)*sin(phi);
-    auto z = 1 - r1;
+    double x = sin(theta)*cos(phi);
+    double y = sin(theta)*sin(phi);
+    double z = r1;
 
     return Vector(x, y, z);
 }
 
 inline Vector random_coseno(double &theta) {//Esta funcion crea direcciones aleatorias con distribucion coseno hemisferico.
-    auto r1 = random_double();
-    auto r2 = random_double();
+    double r1 = random_double();
+    double r2 = random_double();
 
-    auto phi = 2*pi*r1;
+    double phi = 2.0*pi*r2;
 
-    auto z = sqrt(1-r2);
-    auto x = cos(phi)*sqrt(r2);
-    auto y = sin(phi)*sqrt(r2);
+    double z = sqrt(1-r1);
+	theta = acos(z);
 
+    double x = cos(phi)*sin(theta);
+    double y = sin(phi)*sin(theta);
 
     return Vector(x, y, z);
 }
@@ -185,16 +189,22 @@ public:
 		double discriminant= b*b - a*c;
 		// regresar distancia si hay intersección
 		// regresar 0.0 si no hay interseccion
-		if (discriminant<0) {
+		if (discriminant<0.0) {
 			return 0.0;
 		}
 		else{
-			return (-b-sqrt(discriminant)/a);
+			double tpositivo = -b + sqrt(discriminant);
+			double tnegativo = -b - sqrt(discriminant);
+			double t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+
+			if (t < 0.0) return 0.0;
+			else return t;
 		}
 	}
 };
 
-Luz  Esferaluminoza(Color(10, 10, 10));
+Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
+//Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
 Abedo ParIzq(Color(.75, .25, .25));
 Abedo ParDer(Color(.25, .25, .75));
 Abedo ParedAt(Color(.25, .75, .25));
@@ -212,6 +222,7 @@ Sphere spheres[] = {
         Sphere(1e5,  Point(0, -1e5 - 40.8, 0),   &Suelo), // suelo
         Sphere(1e5,  Point(0, 1e5 + 40.8, 0),    &Techo), // techo
         Sphere(16.5, Point(-23, -24.3, -34.6),   &EsAbaIz), // esfera abajo-izq
+		//Sphere(16.5, Point(-23, -24.3, -34.6),   &Esferaluminoza), // esfera abajo-izq
         Sphere(16.5, Point(23, -24.3, -3.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
 		//Sphere(16.5, Point(23, -24.3, -3.6),     &Esferaluminoza), // esfera abajo-der // Para observar las dos fuentes luminosas hay que descomentar esta linea
         Sphere(10.5, Point(0, 24.3, 0),          &Esferaluminoza) // esfera arriba // esfera iluminada
@@ -282,16 +293,16 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 	Vector s; //Utilizamos estos 3 vectores para construir nuestras coordenadas locales
 	Vector ti;
 	coordinateSystem(n,s,ti);
-	//Point re=random_esfera(); //Descomentamos unicamente para muestro esferico (comentar las demas re)
+	Point re=random_esfera(); //Descomentamos unicamente para muestro esferico (comentar las demas re)
 	//Point re=random_hemisferio(); //Descomentamos unicamente para muestro hemisferio (comentar las demas re)
-	double theta;//Descomentamos unicamente para muestro  coseno hemisferico
-	Point re=random_coseno(theta);//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
+	//double theta;//Descomentamos unicamente para muestro  coseno hemisferico
+	//Point re=random_coseno(theta);//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
 
 	//re era random en la esfera pero por siplicidad se los deje a todos.
-	//Point dir(re.dot(Point(s.x,ti.x,n.x)),re.dot(Point(s.y,ti.y,n.y)),re.dot(Point(s.z,ti.z,n.z)));
-	Point dir(Point(s.x,ti.x,n.x).dot(re),Point(s.y,ti.y,n.y).dot(re),Point(s.z,ti.z,n.z).dot(re));
+	Point dir(re.dot(Point(s.x,ti.x,n.x)),re.dot(Point(s.y,ti.y,n.y)),re.dot(Point(s.z,ti.z,n.z)));
+	//Point dir(Point(s.x,ti.x,n.x).dot(re),Point(s.y,ti.y,n.y).dot(re),Point(s.z,ti.z,n.z).dot(re));
 
-    Ray rebota(x,dir);
+    Ray rebota(x,dir.normalize());
     Color attenuation;
     Color emite = obj.m->Emite(x);
 
@@ -299,16 +310,19 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
         return emite;    // y te regresa directamente la luz
 						 // Si es Verdadero hace la estimacion Monte Carlo que viene Abajo.
 
-	double Coseno=n.dot(dir);//
-    //return emite + attenuation.mult(shade(rebota, prof-1))*((1/4.0*pi)*Coseno); //Descomentamos unicamente para muestro esferico (comentar las demas re)
-	//return emite + attenuation.mult(shade(rebota, prof-1))*(1.0/(2.0*pi))*Coseno;//Descomentamos unicamente para muestro hemisferio (comentar las demas re)
-	return  attenuation.mult(shade(rebota, prof-1))*(1.0/pi*cos(theta))*(Coseno);//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
+	double Coseno=n.dot(dir.normalize());//
+
+	//double pdf=(1.0/pi)*cos(theta);
+	//printf("%f \t %f \t",pdf,Coseno);
+    return emite + attenuation*shade(rebota, prof-1)*((4.0*pi)*Coseno); //Descomentamos unicamente para muestro esferico (comentar las demas re)
+	//return emite + attenuation*shade(rebota, prof-1)*((2.0*pi))*(Coseno);//Descomentamos unicamente para muestro hemisferio (comentar las demas re)
+	//return  emite + attenuation*shade(rebota, prof-1)*(Coseno/pdf);//Descomentamos unicamente para muestro coseno hemisferico(comentar las demas re)
 }
 
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
-	int muestras=32;
+	double muestras=32.0;
 	int prof=2;
     clock_t begin = clock();
 	//sleep(3);
@@ -325,6 +339,8 @@ int main(int argc, char *argv[]) {
 	// auxiliar para valor de pixel y matriz para almacenar la imagen
 	Color *pixelColors = new Color[w * h];
 
+	int NUM_THREADS=omp_get_max_threads();
+	fprintf(stderr," \r Vamos a trabajar con %d hilos ",NUM_THREADS);
 	omp_set_num_threads(NUM_THREADS); //Lineas de Codigo para paralelizar
 	#pragma omp parallel for //schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
 
@@ -344,7 +360,7 @@ int main(int argc, char *argv[]) {
 			Vector cameraRayDir = cx * ( double(x)/w - .5) + cy * ( double(y)/h - .5) + camera.d;
 			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 
-			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) ,prof);
+			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) ,prof)*(1.0/muestras);
 			// limitar los tres valores de color del pixel a [0,1] 
 			}
 			//pixelValue = pixelValue;
@@ -366,7 +382,7 @@ int main(int argc, char *argv[]) {
 
 	// PROYECTO 1
 	// Investigar formato ppm
-	FILE *f = fopen("MonteCarloPrueba.ppm", "w");
+	FILE *f = fopen("MonteCarloEsfera.ppm", "w");
 	// escribe cabecera del archivo ppm, ancho, alto y valor maximo de color
 	fprintf(f, "P3\n%d %d\n%d\n", w, h, 255); 
 	for (int p = 0; p < w * h; p++) 
