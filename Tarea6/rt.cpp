@@ -331,8 +331,8 @@ public:
 };
 
 Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
-Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
-//Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
+//Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
 //Conductor EsAbaDer(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
 //Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
 Abedo ParIzq(Color(.75, .25, .25));

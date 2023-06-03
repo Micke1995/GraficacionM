@@ -197,7 +197,7 @@ Color shade(const Ray &r) {
 	// determinar que esfera (id) y a que distancia (t) el rayo intersecta
 	if (!intersect(r, t, id)){
 		return Color();}	// el rayo no intersecto objeto, return Vector() == negro
-
+	//printf("%f \n",t);
 	const Sphere &obj = spheres[id];
 
 	/*if (t<min)
