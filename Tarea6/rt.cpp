@@ -84,6 +84,7 @@ inline Vector LocalGlobal(const Vector &n,Vector &x){
 	return s*x.x+t*x.y+n*x.z;
 	 
 }	
+inline Vector sqrtvec(const Vector &v){ return Vector(sqrt(v.x),sqrt(v.y),sqrt(v.z)); }
 
 inline Vector GlobalLocal(const Vector &n,Vector &x){
 	Vector s,t;
@@ -132,7 +133,7 @@ inline Vector random_coseno(double &theta) {//Esta funcion crea direcciones alea
 
     double phi = 2.0*pi*r2;
 
-    double z = sqrt(1-r1);
+    double z = sqrt(1.0-r1);
 	theta = acos(z);
 
     double x = cos(phi)*sin(theta);
@@ -140,6 +141,21 @@ inline Vector random_coseno(double &theta) {//Esta funcion crea direcciones alea
 
     return Vector(x, y, z);
 }
+inline void random_parametroscoseno(double &theta,double &phi) {
+    double r1 = random_double();
+    double r2 = random_double();
+    phi = 2.0*pi*r2;
+	theta = acos(sqrt(1.0-r1));
+}
+
+inline Vector esfCarte(double  &theta,double &phi) {
+    double x = cos(phi)*sin(theta);
+    double y = sin(phi)*sin(theta);
+	double z = cos(z);
+
+    return Vector(x, y, z);
+}
+
 
 class Ray 
 { 
@@ -193,10 +209,11 @@ class Abedo : public material {
 			double ro,thetao,phio;
 			wo.o=rec.x;
 			wo.d=random_coseno(thetao);
-			
+
 			pdf=(1.0/pi)*cos(thetao);
 
-			CarteEsfericas(wo.d,thetao,phii,ro);			
+			CarteEsfericas(wo.d,thetao,phio,ro);	
+
 			double sigma=0.5*0.5;
 			double A=1.0-sigma/(2.0*(sigma+0.33));
 			double cosio=cos(phii-phio);
@@ -207,7 +224,7 @@ class Abedo : public material {
 			if (cosio=!0){
 				double B=(0.45*sigma)/(sigma+0.09)*cosio*sin(alpha)*tan(beta);	
 			}
-
+			
 			wo.d=LocalGlobal(rec.n,wo.d);
 			atenuacion = albedo*(1.0/pi)*(A+B)*(1.0/pdf);
 			//atenuacion = albedo*(1.0/pi);
@@ -220,22 +237,64 @@ class Abedo : public material {
 Vector refleccion(const Vector& v, const Vector& n) {
     return v - n*v.dot(n)*2.0;
 }
+inline double Fresnel(const double &etap,const double &kapap,const double &sente,const double &coste){
+	
+	double nksin = etap - kapap - sente * sente;		
+	
+	double ab = sqrt(nksin*nksin + etap*kapap*4.0);
+	double a = sqrt((ab+nksin)/2.0);
+
+	double rpernum=ab+coste*coste-2.0*a*coste;
+	double rperdem=ab+coste*coste+2.0*a*coste;
+	double rper=rpernum/rperdem;
+
+	double rparnum=ab*coste*coste + sente * sente * sente * sente - 2.0*a*coste *sente * sente;
+	double rpardem=ab*coste*coste + sente * sente * sente * sente + 2.0*a*coste *sente * sente;
+	double rpar=rper*rparnum/rpardem;
+
+	return (1.0/2.0)*(rper+rpar);
+};
 
 class Conductor: public material {
     public:
-        Conductor(const Color& a) : albedo(a) {}
+        Conductor(const Color& a,const Color& b) : eta(a),kappa(b) {}
 
-        virtual bool Rebota(const Ray &wi, Color& atenuacion,Ray &wo,double &pdf,registro &rec) const override {
-			wo.o=rec.x;
+        virtual bool Rebota(const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+			wo.o = rec.x;
 
-			Vector v=unitVector(wi.d);
-			wo.d=refleccion(v,rec.n);
-			atenuacion = albedo;
-            return (wo.d.dot(rec.n) > 0);
+			Vector v = unitVector(wi.d);
+			wo.d = refleccion(v,rec.n);
+			double coste = wo.d.dot(rec.n);
+			double sente = sin(acos(coste));
+			Color etap = eta*eta*(1.0/(1.00029*1.00029));//*(1.0/(1.00029*1.00029))
+			Color kapap = kappa*kappa*(1.0/(1.00029*1.00029));//
+			
+			double R=Fresnel(etap.x,kapap.x,sente,coste);
+			double G=Fresnel(etap.y,kapap.y,sente,coste);
+			double B=Fresnel(etap.z,kapap.z,sente,coste);
+			
+			atenuacion = Color(R,G,B);
+
+			pdf=1.0;
+            return (wo.d.dot(rec.n) > 0);//
         }
     public:
-        Color albedo;
+        Color eta;
+		Color kappa;
 };
+
+class Dielectrico: public material {
+    public:
+        Dielectrico(const Color& a) : eta(a) {}
+
+        virtual bool Rebota(const Ray &wi, Color& atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+
+        }
+    public:
+        Color eta;
+};
+
+
 
 class Sphere 
 {
@@ -272,7 +331,9 @@ public:
 };
 
 Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
-Conductor EsAbaDer(Color(0.8,0.8,0.8));
+Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
+//Conductor EsAbaDer(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
 //Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
 Abedo ParIzq(Color(.75, .25, .25));
 Abedo ParDer(Color(.25, .25, .75));
@@ -377,8 +438,8 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
-	double muestras=32.0;
-	int prof=4;
+	double muestras=128.0;
+	int prof=8;
     clock_t begin = clock();
 	//sleep(3);
  
