@@ -4,11 +4,13 @@
 #include <stdlib.h>
 #include <stdio.h>  
 #include <omp.h>
-#include <stdio.h>
+#include <utility>
 #include <time.h>       // for clock_t, clock(), CLOCKS_PER_SEC
 //#define NUM_THREADS 12
 #include <cstdlib>
-
+#include <cmath>
+#include<algorithm>
+using namespace std;
 double pi=3.14159265358979323846; //Creamos el valor de pi para facilitarnos varais cosas.
 
 inline double random_double() {
@@ -52,6 +54,13 @@ public:
 	// normalizar vector 
 	Vector& normalize(){ return *this = *this * (1.0 / sqrt(x * x + y * y + z * z)); }
 
+	double magnitud() const {
+        return sqrt(magnitud2());
+        }
+
+    double magnitud2() const {
+        return x*x + y*y + z*z;
+        }
 };
 
 
@@ -84,7 +93,7 @@ inline Vector LocalGlobal(const Vector &n,Vector &x){
 	return s*x.x+t*x.y+n*x.z;
 	 
 }	
-inline Vector sqrtvec(const Vector &v){ return Vector(sqrt(v.x),sqrt(v.y),sqrt(v.z)); }
+//inline Vector sqrtvec(const Vector &v){ return Vector(sqrt(v.x),sqrt(v.y),sqrt(v.z)); }
 
 inline Vector GlobalLocal(const Vector &n,Vector &x){
 	Vector s,t;
@@ -234,11 +243,9 @@ class Abedo : public material {
         Color albedo;
 };
 
-Vector refleccion(const Vector& v, const Vector& n) {
-    return v - n*v.dot(n)*2.0;
-}
-inline double Fresnel(const double &etap,const double &kapap,const double &sente,const double &coste){
-	
+inline double Fresnel(const double &etap,const double &kapap,const double &coste){
+
+	double sente = sin(acos(coste));
 	double nksin = etap - kapap - sente * sente;		
 	
 	double ab = sqrt(nksin*nksin + etap*kapap*4.0);
@@ -254,26 +261,72 @@ inline double Fresnel(const double &etap,const double &kapap,const double &sente
 
 	return (1.0/2.0)*(rper+rpar);
 };
+inline double Beckmann(double const &costh){
+	//printf("%f\n",costh);
+	if (costh>0){
+	double alpha=0.5*0.5;
+	double costh4=costh*costh*costh*costh;
+	double tanh = tan(acos(costh));
+	return exp(-(tanh*tanh)/alpha)/(pi*alpha*costh4);
+	}else return 0.0;
+};
 
-class Conductor: public material {
+
+inline double Gsmith(const Vector &wi,const Vector &wh,const Vector &wo,const Vector &n){
+	double g1=0;
+	double g2=0;
+	double cosi=wi.dot(wh);
+	double coso=wo.dot(wh);
+	double alpha=0.5;
+
+	double thetai=acos(cosi);
+	double thetao=acos(coso);
+
+	if ( ( cosi / wi.dot(n) ) > 0 ){
+		double a1=1.0/(alpha*tan(thetai));
+		if (a1>1.6)
+			g1=(3.535*a1+2.181*a1*a1)/(1+2.276*a1+2.577*a1*a1);	
+		else g1=1.0;
+	} 
+
+	if ( (coso / wo.dot(n)) >  0){
+		double a2=1.0/(alpha*tan(thetao));
+		if (a2>1.6)
+			g2=(3.535*a2+2.181*a2*a2)/(1+2.276*a2+2.577*a2*a2);	
+		else g2=1.0;
+	} 
+
+   return g1*g2;
+};
+Vector refleccion(const Vector& v, const Vector& n) {
+    return  v-n*(v.dot(n)*2.0);
+}
+
+class MicroFasetC: public material {
     public:
-        Conductor(const Color& a,const Color& b) : eta(a),kappa(b) {}
+        MicroFasetC(const Color& a,const Color& b) : eta(a),kappa(b) {}
 
         virtual bool Rebota(const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const override {
 			wo.o = rec.x;
 
-			Vector v = unitVector(wi.d);
+			Vector v =wi.d;
+			v.normalize();
 			wo.d = refleccion(v,rec.n);
-			double coste = wo.d.dot(rec.n);
-			double sente = sin(acos(coste));
-			Color etap = eta*eta*(1.0/(1.00029*1.00029));//*(1.0/(1.00029*1.00029))
-			Color kapap = kappa*kappa*(1.0/(1.00029*1.00029));//
+			Vector wh = wo.d + wi.d;
+
+			double coste = wh.dot(v);
+
+			Color etap = eta*eta*(1.0/(1.00029*1.00029));
+			Color kapap = kappa*kappa*(1.0/(1.00029*1.00029));
+
+			//double cosh = rec.n.dot(wh);
+			//printf("%f\n",coste);
+			double R=Fresnel(etap.x,kapap.x,coste);
+			double G=Fresnel(etap.y,kapap.y,coste);
+			double B=Fresnel(etap.z,kapap.z,coste);
+			//double div = rec.n.dot(v)*rec.n.dot(wo.d)*4.0;
 			
-			double R=Fresnel(etap.x,kapap.x,sente,coste);
-			double G=Fresnel(etap.y,kapap.y,sente,coste);
-			double B=Fresnel(etap.z,kapap.z,sente,coste);
-			
-			atenuacion = Color(R,G,B);
+			atenuacion = Color(R,G,B)*(1.0/(coste));// *div))*Beckmann(cosh)* Gsmith(v,wh,wo.d,rec.n)
 
 			pdf=1.0;
             return (wo.d.dot(rec.n) > 0);//
@@ -283,15 +336,101 @@ class Conductor: public material {
 		Color kappa;
 };
 
-class Dielectrico: public material {
+
+class Conductor: public material {
     public:
-        Dielectrico(const Color& a) : eta(a) {}
+        Conductor(const Color& a,const Color& b) : eta(a),kappa(b) {}
 
-        virtual bool Rebota(const Ray &wi, Color& atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+        virtual bool Rebota(const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+			wo.o = rec.x;
 
+			Vector v =wi.d;
+			wo.d = refleccion(v,rec.n);
+
+			double coste = wo.d.dot(rec.n);
+			Color etap = eta*eta*(1.0/(1.00029*1.00029));//*(1.0/(1.00029*1.00029))
+			Color kapap = kappa*kappa*(1.0/(1.00029*1.00029));//
+			
+			double R=Fresnel(etap.x,kapap.x,coste);
+			double G=Fresnel(etap.y,kapap.y,coste);
+			double B=Fresnel(etap.z,kapap.z,coste);
+			
+			atenuacion = Color(R,G,B)*(1.0/coste);
+			pdf=1.0;
+            return (wo.d.dot(rec.n) > 0);//
         }
     public:
         Color eta;
+		Color kappa;
+};
+
+Vector transmision(Vector &v, const Vector &n,double &eta,double &sint) {
+	//v=GlobalLocal(n,v);
+	double cost=sqrt(1.0-sint);
+	Vector wt=v*(-eta)+n*(v.dot(n)*eta-cost);
+	//wt=LocalGlobal(n,wt);
+    return wt;
+}
+
+Vector Transmision(const Vector& uv, const Vector& n, double etai_over_etat) {
+    double cos_theta = fmin(-n.dot(uv), 1.0);
+    Vector r_out_perp =  (uv + n*cos_theta)*etai_over_etat  ;
+    Vector r_out_parallel =n*( -sqrt(fabs(1.0 - r_out_perp.magnitud2())) );
+    return r_out_perp + r_out_parallel;
+}
+class Dielectrico: public material {
+    public:
+        Dielectrico(const double &a,const double &b) : eta(a),kappa(b) {}
+
+        virtual bool Rebota(const Ray &wi, Color& atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+			wo.o = rec.x;
+			
+
+			Vector v = wi.d;
+			
+			//v.normalize();
+			//Vector v = unitVector(wi.d);
+			double cosi =-v.dot(rec.n);
+			double indicerefrac = cosi > 0.0  ? eta : 1.0/eta;
+
+			//double cost=sqrt(1.0-indicerefrac*indicerefrac*(1.0-cosi*cosi));
+			double sint=sqrt(1.0-cosi*cosi);
+			
+			//bool notrasmite = indicerefrac * sint > 1.0;
+			double f=F(cosi,indicerefrac);
+
+			if (f>random_double()){
+				wo.d=refleccion(v,rec.n);
+				pdf=f;
+			}else{ 
+				//v =GlobalLocal(rec.n,v);
+				//wo.d=transmision(v,rec.n,indicerefrac,sint);
+				//wo.d=Transmision(v,rec.n,indicerefrac);
+				double cost=sqrt(1-eta*eta*(1-cosi*cosi));
+				if (cosi>0.0)
+					wo.d=Vector(-indicerefrac*v.x,-indicerefrac*v.y, cost);
+			   else wo.d=Vector(-indicerefrac*v.x,-indicerefrac*v.y,-cost);
+				//wo.d=LocalGlobal(rec.n,wo.d);
+				pdf=1.0-f;}
+				//wo.d=refleccion(wi.d,rec.n);
+				//pdf=f;
+			atenuacion= Color(1.0,1.0,1.0);
+			
+            return true;//
+
+
+        }
+    public:
+        double eta;
+		double kappa;
+	private:
+			static double F(double &cosi,double &eta){
+				double r0=(1.0 - eta)/(1.0+eta);
+				r0=r0*r0;
+				return r0+(1.0-r0)*pow((1.0-cosi),5); 
+				//Para F utilize la aproximacion de Sclick que esta en el el libro
+				//Raytracing in one weekend la formula esta igual e wikipedia.
+			}	
 };
 
 
@@ -313,7 +452,14 @@ public:
 		double c = oc.dot(oc)-r*r;
 		double discriminant= b*b - a*c;
 
-		if (discriminant<0.0) {
+		if (discriminant==0){
+			if (-b>0.0)
+				return -b;
+			else return 0.0;
+
+		}
+		
+		if (discriminant<0) {
 			return 0.0;
 		}
 		else{
@@ -322,9 +468,13 @@ public:
 			double t;
 			if (tpositivo > 0.0 && tnegativo > 0.0 )
 			t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
-			else 
-			t = (tpositivo > tnegativo) ? tpositivo : tnegativo;
-			if (t < 0.0) return 0.0;
+			else if(tpositivo > 0.0 && tnegativo < 0.0) 
+			t = tpositivo;
+			else if(tpositivo < 0.0 && tnegativo > 0.0)
+			t = tnegativo;
+			else if (tpositivo < 0.0 && tnegativo < 0.0)
+			t=0.0;
+			if (t < 0.001) return 0.0;
 			else return t;
 		}
 	}
@@ -332,9 +482,11 @@ public:
 
 Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
 //Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
-Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
+MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
 //Conductor EsAbaDer(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
 //Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
+Dielectrico Esferacristal(1.5,2.4);
 Abedo ParIzq(Color(.75, .25, .25));
 Abedo ParDer(Color(.25, .25, .75));
 Abedo ParedAt(Color(.25, .75, .25));
@@ -355,7 +507,8 @@ Sphere spheres[] = {
 		//Sphere(16.5, Point(-23, -24.3, -34.6),   &Esferaluminoza), // esfera abajo-izq
         Sphere(16.5, Point(23, -24.3, -3.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
 		//Sphere(16.5, Point(23, -24.3, -3.6),     &Esferaluminoza), // esfera abajo-der // Para observar las dos fuentes luminosas hay que descomentar esta linea
-        Sphere(10.5, Point(0, 24.3, 0),          &Esferaluminoza) // esfera arriba // esfera iluminada
+        Sphere(10.5, Point(0, 24.3, 0),          &Esferaluminoza), // esfera arriba // esfera iluminada
+		Sphere(7.5, Point(-23.0, -33.0, 30.0),          &Esferacristal)
 };
 
 // limita el valor de x a [0,1]
@@ -384,7 +537,6 @@ inline bool intersect(const Ray &r, double &t, int &id) {
 			t= aux[i];
 			id=i;
 		};
-
     };
 
 	for (int i=0;i<NS;i++){
@@ -430,7 +582,7 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
         return emite;   
 
 	
-	double Coseno=rec.n.dot(rebota.d);//
+	double Coseno=rec.n.dot(rebota.d);
 	
 	return  emite + attenuation*shade(rebota, prof-1)*Coseno;
 }
@@ -438,8 +590,8 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
-	double muestras=128.0;
-	int prof=8;
+	double muestras=32.0;
+	int prof=10;
     clock_t begin = clock();
 	//sleep(3);
  
