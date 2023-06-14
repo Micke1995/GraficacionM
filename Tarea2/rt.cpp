@@ -189,16 +189,31 @@ public:
 		double discriminant= b*b - a*c;
 		// regresar distancia si hay intersección
 		// regresar 0.0 si no hay interseccion
-		if (discriminant<0.0) {
+		if (discriminant<0) {
 			return 0.0;
 		}
 		else{
 			double tpositivo = -b + sqrt(discriminant);
 			double tnegativo = -b - sqrt(discriminant);
-			double t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+			double t;
+			if (tpositivo > 0.0 && tnegativo > 0.0 )
+			{
+			t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+			}
+			else if(tpositivo > 0.0 && tnegativo < 0.0) 
+			{
+			t = tpositivo;
+			}
+			else if(tpositivo < 0.0 && tnegativo > 0.0)
+			{
+			t = tnegativo;
+			}
+			else
+			{
+				t=0;
+			}
+			return t;
 
-			if (t < 0.0) return 0.0;
-			else return t;
 		}
 	}
 };
