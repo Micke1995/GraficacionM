@@ -87,7 +87,7 @@ inline Vector unitVector(const Vector &v){
 	return  v * (1.0 / sqrt(v.x * v.x + v.y * v.y + v.z * v.z)); 
 
 };
-inline Vector LocalGlobal(const Vector &n,Vector &x){
+inline Vector LocalGlobal(const Vector &n,const Vector &x){
 	Vector s,t;
 	coordinateSystem(n,s,t);
 	return s*x.x+t*x.y+n*x.z;
@@ -95,7 +95,7 @@ inline Vector LocalGlobal(const Vector &n,Vector &x){
 }	
 //inline Vector sqrtvec(const Vector &v){ return Vector(sqrt(v.x),sqrt(v.y),sqrt(v.z)); }
 
-inline Vector GlobalLocal(const Vector &n,Vector &x){
+inline Vector GlobalLocal(const Vector &n,const Vector &x){
 	Vector s,t;
 	coordinateSystem(n,s,t);
 	return Vector (s.dot(x),t.dot(x),n.dot(x));
@@ -156,10 +156,24 @@ inline void random_parametroscoseno(double &theta,double &phi) {
     phi = 2.0*pi*r2;
 	theta = acos(sqrt(1.0-r1));
 }
+inline Vector random_media(const double &alpha) {//Esta funcion crea direcciones aleatorias con distribucion coseno hemisferico.
+    double r1 = random_double();
+    double r2 = random_double();
 
-inline Vector esfCarte(double  &theta,double &phi) {
+    double phi = 2.0*pi*r2;
+	double theta = atan(sqrt(-(alpha*alpha)*log10(1.0-r1)));
+
+	double z = cos(theta);
     double x = cos(phi)*sin(theta);
     double y = sin(phi)*sin(theta);
+
+    return Vector(x, y, z);
+}
+
+
+inline Vector esfCarte(double  &thetao,double &phi) {
+    double x = cos(phi)*sin(thetao);
+    double y = sin(phi)*sin(thetao);
 	double z = cos(z);
 
     return Vector(x, y, z);
@@ -176,7 +190,7 @@ public:
 };
 
 struct registro{
-	Vector n;
+	Point n;
 	Point x;
 	double t;
 };
@@ -186,23 +200,36 @@ class material {
         virtual Color Emite(const Point& p) const {
             return Color(0,0,0);
         }
+		virtual bool Rebota(const Ray &wi,Ray &wo,const registro &rec) = 0 ;
 
-        virtual bool Rebota(
-            const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const = 0;
+        virtual Color BDRF(const Ray &wi, Ray &wo,const registro &rec) = 0;
+
+		virtual double PDF(const Ray &wi) const = 0;
+
 };
 
 class Luz : public material {
     public:
 
         Luz(Color c) : emit(c) {}
-
-        virtual bool Rebota(const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const override {
-            return false;
-        }
-
         virtual Color Emite(const Point& p) const override {
             return emit;
         }
+
+        virtual bool Rebota(const Ray &wi,Ray &wo,const registro &rec)override {
+            return false;
+        }
+		virtual Color BDRF(const Ray &wi, Ray &wo,const registro &rec) override{
+
+			return emit;
+		}
+
+		virtual double PDF(const Ray &wi) const override {
+			return 1.0;
+			}
+
+
+
 
     public:
         Color emit;
@@ -210,40 +237,64 @@ class Luz : public material {
 
 class Abedo : public material {
     public:
-        Abedo(const Color& a) : albedo(a) {}
+        Abedo(const Color &a,const double &b) : albedo(a),sigma(b*b) {}
 
-        virtual bool Rebota(const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+		virtual bool Rebota(const Ray& wi,Ray& wo,const registro& rec) override {//, Color &atenuacion,double &pdf,registro &rec
+			//wo.o = rec.x;
+			//wo.d = random_coseno(theta); 
+			
+            return true;
+        }
+		virtual Color BDRF(const Ray& wi,Ray& wo,const registro& rec) override{
+			
+			wo.o=rec.x;
+			wo.d=random_coseno(theta);
+			double pdf=(1.0/pi)*cos(theta);
+
+			double ro,phio,thetao;
+			CarteEsfericas(wo.d,thetao,phio,ro);
+
+			
+			
+
 			double ri,thetai,phii;
 			CarteEsfericas(wi.d,thetai,phii,ri);
-			double ro,thetao,phio;
-			wo.o=rec.x;
-			wo.d=random_coseno(thetao);
 
-			pdf=(1.0/pi)*cos(thetao);
+			
 
-			CarteEsfericas(wo.d,thetao,phio,ro);	
-
-			double sigma=0.5*0.5;
 			double A=1.0-sigma/(2.0*(sigma+0.33));
-			double cosio=cos(phii-phio);
+			double cosio = cos((phii-phio));
 			double alpha = ( thetai > thetao) ? thetai : thetao;
 			double beta = ( thetai < thetao) ? thetai : thetao;
 			
 			double B=0;
 			if (cosio=!0){
-				double B=(0.45*sigma)/(sigma+0.09)*cosio*sin(alpha)*tan(beta);	
+				B=(0.45*sigma)/(sigma+0.09)*cosio*sin(alpha)*tan(beta);	
 			}
 			
 			wo.d=LocalGlobal(rec.n,wo.d);
-			atenuacion = albedo*(1.0/pi)*(A+B)*(1.0/pdf);
-			//atenuacion = albedo*(1.0/pi);
-            return true;
-        }
+			
+			return albedo*(1.0/pi)*(A+B)*(1.0/pdf);//*(1.0/pdf)*(1.0/pdf)
+			//return albedo*(1.0/pi)*(1.0/pdf);//
+
+		}
+		virtual double PDF(const Ray &wo) const override{
+			//return (1.0/pi)*cos(theta);
+			return 1.0;
+		}
+
+
+
+
     public:
         Color albedo;
+		double theta;	
+		double sigma;	
+
+
 };
 
-inline double Fresnel(const double &etap,const double &kapap,const double &coste){
+inline double Fresnel(const double& etap,const double& kapap,const double& coste){
 
 	double sente = sin(acos(coste));
 	double nksin = etap - kapap - sente * sente;		
@@ -261,176 +312,178 @@ inline double Fresnel(const double &etap,const double &kapap,const double &coste
 
 	return (1.0/2.0)*(rper+rpar);
 };
-inline double Beckmann(double const &costh){
-	//printf("%f\n",costh);
-	if (costh>0){
-	double alpha=0.5*0.5;
-	double costh4=costh*costh*costh*costh;
-	double tanh = tan(acos(costh));
-	return exp(-(tanh*tanh)/alpha)/(pi*alpha*costh4);
-	}else return 0.0;
-};
 
-
-inline double Gsmith(const Vector &wi,const Vector &wh,const Vector &wo,const Vector &n){
-	double g1=0;
-	double g2=0;
-	double cosi=wi.dot(wh);
-	double coso=wo.dot(wh);
-	double alpha=0.5;
-
-	double thetai=acos(cosi);
-	double thetao=acos(coso);
-
-	if ( ( cosi / wi.dot(n) ) > 0 ){
-		double a1=1.0/(alpha*tan(thetai));
-		if (a1>1.6)
-			g1=(3.535*a1+2.181*a1*a1)/(1+2.276*a1+2.577*a1*a1);	
-		else g1=1.0;
-	} 
-
-	if ( (coso / wo.dot(n)) >  0){
-		double a2=1.0/(alpha*tan(thetao));
-		if (a2>1.6)
-			g2=(3.535*a2+2.181*a2*a2)/(1+2.276*a2+2.577*a2*a2);	
-		else g2=1.0;
-	} 
-
-   return g1*g2;
-};
 Vector refleccion(const Vector& v, const Vector& n) {
-    return  v-n*(v.dot(n)*2.0);
+    return  ((n*(v.dot(n)*2.0))-v).normalize();
 }
 
 class MicroFasetC: public material {
     public:
-        MicroFasetC(const Color& a,const Color& b) : eta(a),kappa(b) {}
+        MicroFasetC(const Color& a,const Color& b,const double &c) : eta(a),kappa(b),alpha(c) {}
 
-        virtual bool Rebota(const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+        virtual bool Rebota(const Ray& wi,Ray& wo,const registro& rec) override{
 			wo.o = rec.x;
-
-			Vector v =wi.d;
-			v.normalize();
+			Vector v =wi.d*(-1.0);
 			wo.d = refleccion(v,rec.n);
-			Vector wh = wo.d + wi.d;
-
-			double coste = wh.dot(v);
-
-			Color etap = eta*eta*(1.0/(1.00029*1.00029));
-			Color kapap = kappa*kappa*(1.0/(1.00029*1.00029));
-
-			//double cosh = rec.n.dot(wh);
-			//printf("%f\n",coste);
-			double R=Fresnel(etap.x,kapap.x,coste);
-			double G=Fresnel(etap.y,kapap.y,coste);
-			double B=Fresnel(etap.z,kapap.z,coste);
-			//double div = rec.n.dot(v)*rec.n.dot(wo.d)*4.0;
-			
-			atenuacion = Color(R,G,B)*(1.0/(coste));// *div))*Beckmann(cosh)* Gsmith(v,wh,wo.d,rec.n)
-
-			pdf=1.0;
-            return (wo.d.dot(rec.n) > 0);//
+            return (wo.d.dot(rec.n) > 0);////}
         }
-    public:
+		virtual Color BDRF(const Ray &wi, Ray &wo,const registro &rec) override{
+
+			Color etap = eta*eta*(1.0/(1.00029*1.00029));//*(1.0/(1.00029*1.00029))
+			Color kapap = kappa*kappa*(1.0/(1.00029*1.00029));//
+			
+			Vector v =wi.d*(-1.0);	
+			Vector direccion=random_media(alpha);
+			Vector wh=LocalGlobal(rec.n,direccion);
+			wh.normalize();
+			wo.d=refleccion(v,wh);
+
+
+			double costh = wh.dot(rec.n);
+			double beckam;
+			beckam=D(costh);
+
+			double smith=1.0;
+
+			double cosv1=wi.d.dot(rec.n)*(-1.0);
+			double cosv2=wo.d.dot(rec.n);
+
+			if((wi.d.dot(wh)/cosv1)>0.0 && (wo.d.dot(wh)/cosv2)>0.0){
+				smith=GSmith(cosv1)*GSmith(cosv2);
+				
+			}
+			double cost =wh.dot(wo.d);
+			double R=Fresnel(etap.x,kapap.x,cost);
+			double G=Fresnel(etap.y,kapap.y,cost);
+			double B=Fresnel(etap.z,kapap.z,cost);
+
+			double divisor=1.0/(4.0*fabs(cosv1)*fabs(cosv2));
+			double pdf2=(4.0*fabs(cost))/(costh*beckam);//*beckam
+
+			
+			return Color(R,G,B)*pdf2*divisor*beckam*smith;//*divisor*pdf2*smith;//*beckam;
+
+		}
+
+		virtual double PDF(const Ray &wi)const override {
+			return 1.0;
+
+		}
+
+		double  D(const double &costh){
+				if (costh>0){
+				double alpha2=alpha*alpha;
+				double costh2 = costh*costh;
+				double tang=sqrt(1.0-costh2)/costh;
+				return exp(-((tang*tang)/alpha2))/(pi*alpha2*costh2*costh2);
+				}else return 0.0;
+		}
+		double GSmith(const double &cosv){
+				
+				double a=(cosv/(sqrt(1.0-cosv*cosv)))*alpha;
+				if (a<1.6){
+					return (3.535*a+2.181*a*a)/(1+2.276*a+2.577*a*a) ;
+					}else return 1.0;
+		
+}
+
+    private:
         Color eta;
 		Color kappa;
+		double alpha;
 };
+
 
 
 class Conductor: public material {
     public:
         Conductor(const Color& a,const Color& b) : eta(a),kappa(b) {}
 
-        virtual bool Rebota(const Ray &wi, Color &atenuacion,Ray &wo,double &pdf,registro &rec) const override {
+        virtual bool Rebota(const Ray& wi,Ray& wo,const registro& rec) override{
 			wo.o = rec.x;
-
-			Vector v =wi.d;
+			Vector v =(wi.d*(-1.0)).normalize();
 			wo.d = refleccion(v,rec.n);
 
-			double coste = wo.d.dot(rec.n);
-			Color etap = eta*eta*(1.0/(1.00029*1.00029));//*(1.0/(1.00029*1.00029))
-			Color kapap = kappa*kappa*(1.0/(1.00029*1.00029));//
-			
-			double R=Fresnel(etap.x,kapap.x,coste);
-			double G=Fresnel(etap.y,kapap.y,coste);
-			double B=Fresnel(etap.z,kapap.z,coste);
-			
-			atenuacion = Color(R,G,B)*(1.0/coste);
-			pdf=1.0;
-            return (wo.d.dot(rec.n) > 0);//
+            return (wo.d.dot(rec.n) > 0);////}
         }
+		virtual Color BDRF(const Ray& wi, Ray& wo,const registro& rec) override{
+			double cost = wo.d.dot(rec.n);
+
+
+			Color etap = eta*eta;//*(1.0/(1.00029*1.00029));//*(1.0/(1.00029*1.00029))
+			Color kapap = kappa*kappa;//*(1.0/(1.00029*1.00029));//
+
+
+			double R=Fresnel(etap.x,kapap.x,cost);
+			double G=Fresnel(etap.y,kapap.y,cost);
+			double B=Fresnel(etap.z,kapap.z,cost);
+			
+			return Color(R,G,B)*(1.0/cost);
+
+		}
+
+		virtual double PDF(const Ray &wi)const override {
+			return 1.0;
+
+		}
     public:
         Color eta;
 		Color kappa;
 };
 
-Vector transmision(Vector &v, const Vector &n,double &eta,double &sint) {
-	//v=GlobalLocal(n,v);
-	double cost=sqrt(1.0-sint);
-	Vector wt=v*(-eta)+n*(v.dot(n)*eta-cost);
-	//wt=LocalGlobal(n,wt);
-    return wt;
-}
 
-Vector Transmision(const Vector& uv, const Vector& n, double etai_over_etat) {
-    double cos_theta = fmin(-n.dot(uv), 1.0);
-    Vector r_out_perp =  (uv + n*cos_theta)*etai_over_etat  ;
-    Vector r_out_parallel =n*( -sqrt(fabs(1.0 - r_out_perp.magnitud2())) );
-    return r_out_perp + r_out_parallel;
-}
+
 class Dielectrico: public material {
     public:
         Dielectrico(const double &a,const double &b) : eta(a),kappa(b) {}
 
-        virtual bool Rebota(const Ray &wi, Color& atenuacion,Ray &wo,double &pdf,registro &rec) const override {
-			wo.o = rec.x;
+        virtual bool Rebota(const Ray& wi,Ray& wo,const registro& rec) override{
 			
-
+			//printf("%f,%f,%f\n",wo.o.x,wo.o.y,wo.o.z);
+			wo.o = rec.x;	
 			Vector v = wi.d;
-			
-			//v.normalize();
-			//Vector v = unitVector(wi.d);
-			double cosi =-v.dot(rec.n);
+			double cosi = v.dot(rec.n);		
+
 			double indicerefrac = cosi > 0.0  ? eta : 1.0/eta;
-
-			//double cost=sqrt(1.0-indicerefrac*indicerefrac*(1.0-cosi*cosi));
-			double sint=sqrt(1.0-cosi*cosi);
 			
-			//bool notrasmite = indicerefrac * sint > 1.0;
-			double f=F(cosi,indicerefrac);
-
-			if (f>random_double()){
-				wo.d=refleccion(v,rec.n);
-				pdf=f;
+			double cost=sqrt(1.0-indicerefrac*indicerefrac*(1.0-cosi*cosi));
+			
+			Fresnel=F(cosi,cost);
+			
+			if (random_double()<Fresnel){
+				wo.d=refleccion(v*(-1.0),rec.n);
 			}else{ 
-				//v =GlobalLocal(rec.n,v);
-				//wo.d=transmision(v,rec.n,indicerefrac,sint);
-				//wo.d=Transmision(v,rec.n,indicerefrac);
-				double cost=sqrt(1-eta*eta*(1-cosi*cosi));
-				if (cosi>0.0)
-					wo.d=Vector(-indicerefrac*v.x,-indicerefrac*v.y, cost);
-			   else wo.d=Vector(-indicerefrac*v.x,-indicerefrac*v.y,-cost);
-				//wo.d=LocalGlobal(rec.n,wo.d);
-				pdf=1.0-f;}
-				//wo.d=refleccion(wi.d,rec.n);
-				//pdf=f;
-			atenuacion= Color(1.0,1.0,1.0);
+				wo.d= cosi > 0.0  ? Vector(-indicerefrac*v.x,-indicerefrac*v.y,-cost) : Vector(-indicerefrac*v.x,-indicerefrac*v.y,cost);
+				
+			}
+			wo.d.normalize();
+		return true;
+
+		}
+		virtual Color BDRF(const Ray &wi, Ray &wo,const registro &rec) override{	
 			
-            return true;//
+			return Color(1.0,1.0,1.0);
 
 
-        }
-    public:
+		}
+		virtual double PDF(const Ray &wi)const override {
+			return 1.0;
+
+		}
+		double F(const double &cosi,const double &cost){
+			
+			double rpar=(eta*cosi-cost)/(eta*cosi+cost);
+			rpar=rpar*rpar;
+			double rper=(cosi-eta*cost)/(cosi+eta*cost);
+			rper=rper*rper;
+			return 0.5*(rpar+rper);
+			
+		}
+    private:
         double eta;
 		double kappa;
-	private:
-			static double F(double &cosi,double &eta){
-				double r0=(1.0 - eta)/(1.0+eta);
-				r0=r0*r0;
-				return r0+(1.0-r0)*pow((1.0-cosi),5); 
-				//Para F utilize la aproximacion de Sclick que esta en el el libro
-				//Raytracing in one weekend la formula esta igual e wikipedia.
-			}	
+		double Fresnel;
+	
 };
 
 
@@ -481,19 +534,26 @@ public:
 };
 
 Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
-//Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
-MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//Conductor EsAbaIz(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//MicroFasetC EsAbaIz(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803),0.3);//Aluminio
+//MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803),0.3);//Aluminio
+MicroFasetC EsAbaIz(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434),0.3);//Oro
 //Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
-//Conductor EsAbaDer(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
+//Conductor Esferacristal(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
 //Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
 Dielectrico Esferacristal(1.5,2.4);
-Abedo ParIzq(Color(.75, .25, .25));
-Abedo ParDer(Color(.25, .25, .75));
-Abedo ParedAt(Color(.25, .75, .25));
-Abedo Suelo(Color(.25, .75, .75));
-Abedo Techo(Color(.75, .75, .25));
-Abedo EsAbaIz(Color(.2, .3, .4));
-//Abedo EsAbaDer(Color(.4, .3, .2));
+
+Abedo ParIzq(Color(.75, .25, .25),0.5);//roja
+//Abedo ParDer(Color(.25, .75, .25),0.5);//verde
+Abedo ParDer(Color(.25, .25, .75),0.5);//azul
+//Abedo ParedAt(Color(1.0, 1.0, 1.0),0.5);//blanco
+//Abedo Suelo(Color(1.0, 1.0, 1.0),0.5);//blanco
+//Abedo Techo(Color(1.0, 1.0, 1.0),0.5);//blanco
+Abedo ParedAt(Color(.25, .75, .25),0.5);//verde
+Abedo Suelo(Color(.25, .75, .75),0.5);//verde bajito
+Abedo Techo(Color(.75, .75, .25),0.5);//amarillo
+//Abedo EsAbaIz(Color(.2, .3, .4),0.5);
+Abedo EsAbaDer(Color(.4, .3, .2),0.5);
 
 
 Sphere spheres[] = {
@@ -503,12 +563,12 @@ Sphere spheres[] = {
         Sphere(1e5,  Point(0, 0, -1e5 - 81.6),   &ParedAt), // pared detras
         Sphere(1e5,  Point(0, -1e5 - 40.8, 0),   &Suelo), // suelo
         Sphere(1e5,  Point(0, 1e5 + 40.8, 0),    &Techo), // techo
-        Sphere(16.5, Point(-23, -24.3, -34.6),   &EsAbaIz), // esfera abajo-izq
+        Sphere(18.5, Point(-23, -22.3, -34.6),   &EsAbaIz), // esfera abajo-izq
 		//Sphere(16.5, Point(-23, -24.3, -34.6),   &Esferaluminoza), // esfera abajo-izq
-        Sphere(16.5, Point(23, -24.3, -3.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
+        Sphere(12.5, Point(23, -28.3, -30.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
 		//Sphere(16.5, Point(23, -24.3, -3.6),     &Esferaluminoza), // esfera abajo-der // Para observar las dos fuentes luminosas hay que descomentar esta linea
         Sphere(10.5, Point(0, 24.3, 0),          &Esferaluminoza), // esfera arriba // esfera iluminada
-		Sphere(7.5, Point(-23.0, -33.0, 30.0),          &Esferacristal)
+		Sphere(7.5, Point(-23.0, -32.5, 30.0),          &Esferacristal)
 };
 
 // limita el valor de x a [0,1]
@@ -553,47 +613,63 @@ inline bool intersect(const Ray &r, double &t, int &id) {
 	return false;
 }
 
-// Calcula el valor de color para el rayo dado
-Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una funcion recursiva, esto nos permite lanzar un segundo rayo desde
+
+Color shade(const Ray &r) { 
+	
+	double t; 						 						 
+	int id = 0;	
+	Color attenuation;
+	Ray rebota=r;
 	registro rec;
-	double t; 						 
-	double h;						 
-	int id = 0;						 
+	Color emite;
+	double q=0.3;
+	double continueprob=1.0-q;
+	double Coseno;
+	double pdf;
 
-	if (prof <= 0) // Si ya se ha llegado 
-        return Color();
-
+	Color troughpout(1.0,1.0,1.0);
 	if (!intersect(r, t, id)){
-		return Color();}	// el rayo no intersecto objeto, return Vector() == negro
+		return Color();
+		}
+
+
+	do{			 
 
 	const Sphere &obj = spheres[id];
 
-	rec.x=r.d*t+r.o; 
+	rec.x=rebota.d*t+rebota.o; 
 	rec.n=(rec.x-obj.p).normalize();
 	rec.t=t;
-
-	Color attenuation;
-    Color emite = obj.m->Emite(rec.x);
-
-	Ray rebota;
-	double pdf;
-
-    if (!obj.m->Rebota(r, attenuation,rebota,pdf,rec)) 
-        return emite;   
-
 	
-	double Coseno=rec.n.dot(rebota.d);
+    emite = obj.m->Emite(rec.x);	
+
+    if (!obj.m->Rebota(r, rebota,rec)) {
+		break; 
+	}
+		attenuation=obj.m->BDRF(r,rebota,rec);	
+		Coseno=fabs(rec.n.dot(rebota.d));	
+		pdf=obj.m->PDF(rebota);
+
+	if (random_double()<q) 
+		break;
 	
-	return  emite + attenuation*shade(rebota, prof-1)*Coseno;
+	troughpout=troughpout*attenuation*(Coseno/(continueprob*pdf));
+	
+	if (!intersect(rebota, t, id)){
+		break;
+		}
+
+	}while(true) ;
+	
+	return  emite*troughpout;
 }
-
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
-	double muestras=32.0;
-	int prof=10;
+	double muestras = 256.0;
+
     clock_t begin = clock();
-	//sleep(3);
+
  
 	int w = 1024, h = 768; // image resolution
   
@@ -628,7 +704,7 @@ int main(int argc, char *argv[]) {
 			Vector cameraRayDir = cx * ( double(x)/w - .5) + cy * ( double(y)/h - .5) + camera.d;
 			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 
-			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) ,prof)*(1.0/muestras);
+			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) )*(1.0/muestras);
 			// limitar los tres valores de color del pixel a [0,1] 
 			}
 			//pixelValue = pixelValue;
@@ -650,7 +726,7 @@ int main(int argc, char *argv[]) {
 
 	// PROYECTO 1
 	// Investigar formato ppm
-	FILE *f = fopen("Conductor.ppm", "w");
+	FILE *f = fopen("OrenNayar.ppm", "w");
 	// escribe cabecera del archivo ppm, ancho, alto y valor maximo de color
 	fprintf(f, "P3\n%d %d\n%d\n", w, h, 255); 
 	for (int p = 0; p < w * h; p++) 

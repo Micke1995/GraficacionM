@@ -343,13 +343,14 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
     Vector u;
     ortonormalSystem(w,v,u); // Este sistema ortonormal es de raytraicing in one weekend, sirve igual si lo haces bien.
 	Vector dir=v*re.x+u*re.y+w*re.z;*/
-    
+
 	double Coseno=n.dot(dir);
     Ray rebota(x,dir);
     Color attenuation ;
     Color emite = obj.m->Emite(x);
     
-	
+	if (Coseno  < 0)
+        return emite;
 
     if (!obj.m->Rebota(r, attenuation)) 
         return emite;  

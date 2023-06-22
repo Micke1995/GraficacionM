@@ -235,8 +235,8 @@ class Abedo : public material {
 			}
 			
 			wo.d=LocalGlobal(rec.n,wo.d);
-			atenuacion = albedo*(1.0/pi)*(A+B)*(1.0/pdf);
-			//atenuacion = albedo*(1.0/pi);
+			//atenuacion = albedo*(1.0/pi)*(A+B)*(1.0/pdf);
+			atenuacion = albedo*(1.0/pi);
             return true;
         }
     public:
@@ -481,17 +481,22 @@ public:
 };
 
 Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
-//Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
-//MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//Conductor EsAbaIz(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803),0.03);//Aluminio
+//MicroFasetC EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434),0.03);//Aluminio
 //Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
 //Conductor EsAbaDer(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
 //Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
-Dielectrico Esferacristal(1.5,2.4);
-Abedo ParIzq(Color(.75, .25, .25));
-Abedo ParDer(Color(.25, .25, .75));
-Abedo ParedAt(Color(.25, .75, .25));
-Abedo Suelo(Color(.25, .75, .75));
-Abedo Techo(Color(.75, .75, .25));
+//Dielectrico Esferacristal(1.5,2.4);
+Abedo ParIzq(Color(.75, .25, .25));//roja
+//Abedo ParDer(Color(.25, .75, .25));//verde
+Abedo ParDer(Color(.25, .25, .75));//azul
+//Abedo ParedAt(Color(1.0, 1.0, 1.0));//blanco
+//Abedo Suelo(Color(1.0, 1.0, 1.0));//blanco
+//Abedo Techo(Color(1.0, 1.0, 1.0));//blanco
+Abedo ParedAt(Color(.25, .75, .25));//verde
+Abedo Suelo(Color(.25, .75, .75));//verde bajito
+Abedo Techo(Color(.75, .75, .25));//amarillo
 Abedo EsAbaIz(Color(.2, .3, .4));
 Abedo EsAbaDer(Color(.4, .3, .2));
 
@@ -508,7 +513,7 @@ Sphere spheres[] = {
         Sphere(16.5, Point(23, -24.3, -3.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
 		//Sphere(16.5, Point(23, -24.3, -3.6),     &Esferaluminoza), // esfera abajo-der // Para observar las dos fuentes luminosas hay que descomentar esta linea
         Sphere(10.5, Point(0, 24.3, 0),          &Esferaluminoza), // esfera arriba // esfera iluminada
-		Sphere(7.5, Point(-23.0, -33.0, 30.0),          &Esferacristal)
+		//Sphere(7.5, Point(-23.0, -33.0, 30.0),          &Esferacristal)
 };
 
 // limita el valor de x a [0,1]
@@ -583,7 +588,7 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 		}
 	double Coseno=rec.n.dot(rebota.d);
 
-	troughpout=attenuation*Coseno;
+	troughpout=troughpout*attenuation*(Coseno/pdf);
 	
 	if (!intersect(rebota, t, id)){
 		break;
@@ -597,8 +602,8 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
-	double muestras=32.0;
-	int prof=1;
+	double muestras=128.0;
+	int prof=10;
     clock_t begin = clock();
 	//sleep(3);
  

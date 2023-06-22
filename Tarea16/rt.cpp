@@ -15,9 +15,6 @@
 using namespace std;
 double pi=3.14159265358979323846; //Creamos el valor de pi para facilitarnos varais cosas.
 
-random_device rd;  // Will be used to obtain a seed for the random number engine
-mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-uniform_real_distribution<> dis(0.0, 1.0);
  
 inline double random_double() {
     // Returns a random real in [0,1).

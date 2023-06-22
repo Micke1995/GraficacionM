@@ -235,8 +235,8 @@ class Abedo : public material {
 			}
 			
 			wo.d=LocalGlobal(rec.n,wo.d);
-			atenuacion = albedo*(1.0/pi)*(A+B)*(1.0/pdf);
-			//atenuacion = albedo*(1.0/pi);
+			//atenuacion = albedo*(1.0/pi)*(A+B)*(1.0/pdf);
+			atenuacion = albedo*(1.0/pi);
             return true;
         }
     public:
@@ -481,7 +481,7 @@ public:
 };
 
 Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
-Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//Conductor EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
 //MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
 //Conductor EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
 //Conductor EsAbaDer(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
@@ -493,7 +493,7 @@ Abedo ParedAt(Color(.25, .75, .25));
 Abedo Suelo(Color(.25, .75, .75));
 Abedo Techo(Color(.75, .75, .25));
 Abedo EsAbaIz(Color(.2, .3, .4));
-//Abedo EsAbaDer(Color(.4, .3, .2));
+Abedo EsAbaDer(Color(.4, .3, .2));
 
 
 Sphere spheres[] = {
@@ -587,7 +587,7 @@ Color shade(const Ray &r) { //Agregamos la profundidad para hacer una funcion re
 	if (random_double()<q) 
 		break;
 
-	troughpout=troughpout*attenuation*(Coseno/continueprob);
+	troughpout=troughpout*attenuation*(Coseno/(continueprob*pdf));
 	
 
 	
