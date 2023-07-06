@@ -444,7 +444,7 @@ Color shade(const Ray &r,int uz) {
     Color emite = obj.m->Emite(x);
 
     if (!obj.m->Rebota(r, attenuation,rebota) &&uz==1 ) //Si el objeto es un emisor regresa el emisor, pero solo la primera vez
-        return emite;  
+        return emite;  	
 
 	double pw=1.0 / (2.0 * pi * (1.0 - costmax));
 
@@ -458,7 +458,7 @@ Color shade(const Ray &r,int uz) {
 	Color emite2 = obj2.m->Emite(x2);
 	Color LD; 
     if (!obj2.m->Rebota(r, attenuation,rebota)){ //
-			LD = attenuation.mult(emite2)*(Coseno/pw);
+			LD = attenuation.mult(emite2)*(fabs(Coseno)/pw);
 		} 
 
 	double theta;
@@ -477,7 +477,7 @@ Color shade(const Ray &r,int uz) {
 		return Color();
 	
 	// calculo de iluminacion indirecta
-	Color Lind = attenuation.mult(shade(rebota2, 0))* (Coseno2/(pdf2*continueprob)) ;
+	Color Lind = attenuation.mult(shade(rebota2, 0))* (fabs(Coseno2)/(pdf2*continueprob)) ;
 
 	return emite+LD+Lind;
 

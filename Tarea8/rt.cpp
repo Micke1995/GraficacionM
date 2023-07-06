@@ -255,8 +255,8 @@ class Abedo : public material {
 			}
 
 
-			atenuacion = albedo*(1.0/pi)*(A+B);
-			//atenuacion = albedo*(1.0/pi);
+			//atenuacion = albedo*(1.0/pi)*(A+B);
+			atenuacion = albedo*(1.0/pi);
             return true;
         }
     public:
@@ -378,13 +378,15 @@ inline bool intersect(const Ray &r, double &t, int &id) {
 	return false;
 }
 
-Color MonteCarloBDRF(const Ray &r,int prof,double &pdf) { 
+Color MonteCarloBDRF(const Ray &r,int prof,double &pdf,double &pdf2) { 
 	double t; 						
 	double h;						 
 	int id = 0;						 
 	
 
 	if (prof <= 0) 
+		//pdf=0.0;
+		//pdf2=0.0;
         return Color();
 
 	if (!intersect(r, t, id)){
@@ -392,7 +394,9 @@ Color MonteCarloBDRF(const Ray &r,int prof,double &pdf) {
 	const Sphere &obj = spheres[id];
 
 	Point x=r.d*t+r.o; 
-	
+	double radio=10.5; 
+	Vector luz(0, 24.3,0);
+
 	Vector n=(x-obj.p).normalize();
 	Vector s; 
 	Vector ti;
@@ -404,22 +408,29 @@ Color MonteCarloBDRF(const Ray &r,int prof,double &pdf) {
 
 	Point re=random_coseno(theta);
 	Ray rebota(x,re);
-    if (!obj.m->Rebota(r, attenuation,rebota))
-        return emite;    
+
+
+    if (!obj.m->Rebota(r, attenuation,rebota)){
+		double Distancia=rebota.d.magnitud2();
+		Vector n2=(rebota.d-luz).normalize();
+		double cosenoluz=n2.z;
+		pdf2=Distancia/(4.0*pi*radio*radio*cosenoluz);
+        return emite;
+		}
 	Point dir(re.dot(Point(s.x,ti.x,n.x)),re.dot(Point(s.y,ti.y,n.y)),re.dot(Point(s.z,ti.z,n.z)));
 
     rebota=Ray(x,dir.normalize());
 
 	double Coseno=n.dot(dir.normalize());//
+	pdf=(1.0/pi)*re.z;
+	
 
-	pdf=(1.0/pi)*cos(theta);
-
-	return  emite + attenuation*MonteCarloBDRF(rebota, prof-1,pdf)*(Coseno/pdf);
+	return  emite + attenuation*MonteCarloBDRF(rebota, prof-1,pdf,pdf2)*(Coseno/pdf);
 }
 
 
 
-Color MonteCarloLuz(const Ray &r,int prof,double &pdf) { 
+Color MonteCarloLuz(const Ray &r,int prof,double &pdf,double &pdf2) { 
 	double t; 						 
 	double h;						
 	int id = 0;						
@@ -427,12 +438,14 @@ Color MonteCarloLuz(const Ray &r,int prof,double &pdf) {
         return Color();
 
 	if (!intersect(r, t, id)){
+
 		return Color();}	
 	const Sphere &obj = spheres[id];
 	Point x=r.d*t+r.o; 
 	Vector n=(x-obj.p).normalize();
 	double radio=10.5; 
 	Vector luz(0, 24.3,0);
+
     Vector dir=luz+random_esfera2(radio);
 	Vector n2=(dir-luz).normalize();	
 	dir=dir-x;	
@@ -442,28 +455,34 @@ Color MonteCarloLuz(const Ray &r,int prof,double &pdf) {
     Color attenuation;
     Color emite = obj.m->Emite(x);
 	double Coseno=n.dot(dir);
-	if (Coseno  < 0)
+	if (Coseno  <= 0)
         return emite;
-	pdf=Distancia/(4.0*pi*radio*radio*cosenoluz);
-    if (!obj.m->Rebota(r, attenuation,rebota)||cosenoluz<0.001){ //
+
+
+	
+    if (!obj.m->Rebota(r, attenuation,rebota)||cosenoluz<=0.001){ //
+			pdf2=0.5*r.d.z;
 			return emite;
-		} 					 
-    return emite + attenuation.mult(MonteCarloLuz(rebota, prof-1,pdf))*(Coseno/pdf); 
+		} 		
+	pdf=Distancia/(4.0*pi*radio*radio*cosenoluz);						 
+    return emite + attenuation.mult(MonteCarloLuz(rebota, prof-1,pdf,pdf2))*(fabs(Coseno)/pdf); 
 }
 
 
 
  //Calcula el valor de color para el rayo dado
 Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una funcion recursiva, esto nos permite lanzar un segundo rayo desde
-	double pdf1;
-	double pdf2;
-	Color bdrf=MonteCarloBDRF(r,2,pdf1);
-	Color luz=MonteCarloLuz(r,2,pdf2);
+	double pdfdrf1,pdfdrf2;
+	double pdfl1,pdfl2;
 
-	double w1=PowerHeuristic(pdf1,pdf2);
-	double w2=PowerHeuristic(pdf2,pdf1);
+	Color bdrf=MonteCarloBDRF(r,2,pdfdrf1,pdfdrf2);
+	Color luz=MonteCarloLuz(r,2,pdfl1,pdfl2);
 
-	return  luz*w2+ bdrf*w1;
+	double w1=PowerHeuristic(pdfl1,pdfl2);
+	double w2=PowerHeuristic(pdfdrf1,pdfdrf2);
+	//printf("%f,%f\n",w1,w2);
+
+	return  luz*w1+ bdrf*w2;
 	
 
 }
@@ -472,6 +491,7 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
 	double muestras=32.0;
+	double invm=1.0/muestras;
 	int prof=2;
     clock_t begin = clock();
 	//sleep(3);
@@ -509,7 +529,7 @@ int main(int argc, char *argv[]) {
 			Vector cameraRayDir = cx * ( double(x)/w - .5) + cy * ( double(y)/h - .5) + camera.d;
 			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 
-			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) ,prof)*(1.0/muestras);
+			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) ,prof)*invm;
 			// limitar los tres valores de color del pixel a [0,1] 
 			}
 			//pixelValue = pixelValue;
