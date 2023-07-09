@@ -439,8 +439,8 @@ class Conductor: public material {
 			wo.o = rec.x;
 			Vector v =(wi.d*(-1.0)).normalize();
 			wo.d = refleccion(v,rec.n);
-			wo.d.normalize();
-            return (wo.d.dot(rec.n) > 0);//true;//(wo.d.dot(rec.n) > 0);////}
+			//wo.d.normalize();
+            return (wo.d.dot(rec.n) > 0);// true;//(wo.d.dot(rec.n) > 0);//true;//(wo.d.dot(rec.n) > 0);////}
         }
 		virtual Color BDRF(const Ray& wi, Ray& wo,const registro& rec) override{
 			double cost = wo.d.dot(rec.n);
@@ -453,6 +453,7 @@ class Conductor: public material {
 			double B=Fresnel(etap.z,kapap.z,cost);
 			
 			return Color(R,G,B)*(1.0/cost);
+			// return Color(1.0,1.0,1.0);
 		}
 
 		virtual double PDF(const Ray &wo,const registro &rec) override {
@@ -465,73 +466,79 @@ class Conductor: public material {
 };
 
 
-Vector refract(const Vector& uv, const Vector& n, double etai_over_etat) {
-    auto cos_theta = fmin(-uv.dot(n), 1.0);
-    Vector r_out_perp =  (uv + n*cos_theta)* etai_over_etat;
-    Vector r_out_parallel = n* -sqrt(fabs(1.0 - r_out_perp.magnitud2()))  ;
-    return r_out_perp + r_out_parallel;
-}
-
-class Dielectrico: public material {
+class Dielectrico: public material {////// Tarea 18/////////////////
     public:
         Dielectrico(const double &a,const double &b) : etaT(a),etaI(b) {}
+		
+        virtual bool Rebota(const Ray& wi,Ray& wo,const registro& rec) override{	
+			normal=rec.n.dot(wi.d*-1.0 ) > 0 ? rec.n: rec.n* -1.0;
 
-        virtual bool Rebota(const Ray& wi,Ray& wo,const registro& rec) override{
-            return true;//(wo.d.dot(rec.n) > 0);////}
-        }
-		virtual Color BDRF(const Ray& wi, Ray& wo,const registro& rec) override{
+			Vector v= (wi.d*-1.0);
+			double cosi = v.dot(rec.n);
 			
-			wo.o=rec.x;
-			Vector v= wi.d*(-1.0);
-			Vector normal= rec.n.dot(v) > 0 ?  rec.n* -1.0: rec.n ;
-			double cosi = (v).dot(rec.n);
-			//cosi = Clamp(cosi, -1, 1);
 			bool entra = cosi > 0.f;
 			if(!entra){
-				swap(etaI, etaT);
+				indicerefrac = etaT/etaI;
 				cosi = fabs(cosi);
-			}
-			indicerefrac = etaI/etaT;
+			}else indicerefrac = etaI/etaT;			
 
-			double sint =indicerefrac * sqrt(max(0.0,1.0 - cosi * cosi));
+			double sint = indicerefrac * sqrt( 1.0 - cosi * cosi);
+			
+			wo.o=rec.x; 	
+
+			if (sint >= 1.0){
+		 		return false;
+			}
+			cost = sqrt( 1.0 - sint * sint);
+			double rpar,rper;
+
+
+			// Fresnel= entra ? F(cost,cosi, etaT, etaI) : F(cost,cosi, etaI, etaT);
+			Fresnel= entra ? F(cost,cosi, etaI, etaT) : F(cost,cosi, etaT, etaI);
+
+			bool refraccion = random_double() < Fresnel;//dis(gen)< Fresnel;//false;//random_double() < Fresnel;//
 			
 
-			if (sint >= 1){
-				wo.d = refleccion(wi.d,normal);
-				return Color();
-			}
-			double cost = sqrt( 1.0 - sint * sint);
-			Fresnel=F(cosi,cost);
-			
-			bool reflect = random_double() < Fresnel;
+			if (refraccion) {
+				wo.d=refleccion(v,rec.n); //wi.d - normal*2.0*((normal.dot(wi.d)));// refleccion(v,normal); //refleccion(v,normal);  
+			 	//wo.d.normalize();
+			 	return (wo.d.dot(rec.n) > 0);//true;
 
-		
-			if (reflect){
-				Vector wr = refleccion(v,normal);
-				wr.normalize();
-				double pr = Fresnel;
-				double fr = Fresnel / fabs(cosi);
-				wo.d=wr;
-				return Color(1.0,1.0,1.0)*(fr*(fabs(normal.dot(wr))/pr));
+			}else{
+					
+				wo.d = (wi.d * indicerefrac) + normal*(indicerefrac * cosi - cost);//Formulacion PBR si funciona adecuadamente deacuerdo a las consideracciones que  tengo
+				wo.d.normalize();
+				// wo.d= entra ? Vector(indicerefrac*wi.d.x,indicerefrac*wi.d.y,cosTt):Vector(indicerefrac*wi.d.x,indicerefrac*wi.d.y,-cosTt); // Formulacion sugerencia del profesor no funciona adecuadamente no se por que	
+				// wo.d= refraction(wi.d,normal,indicerefrac);// Formulacion Ray Tracing in one weekend no funciona adecuadamente tampoco se por que 
+            	return true;
+			 }
+        }
+		virtual Color BDRF(const Ray& wi, Ray& wo,const registro& rec) override{
+
+			if (!refraccion) {
+				double cosr=(wi.d*-1.0).dot(rec.n);
+				
+				return Color( Fresnel,Fresnel,Fresnel)*(1.0/fabs(cosr));//*(1.0/fabs(cosr));//*(1/fabs(cosr));
+
 			}else {
-				Vector wt = ((v*-1.0) * indicerefrac) + normal*(indicerefrac * cosi - cost);
-				wt.normalize();
-				double pt = 1.0 - Fresnel;
-				double ft = (indicerefrac *indicerefrac*(1.0 - Fresnel)) / fabs(cost);
-				wo.d=wt;
-				return Color(1.0,1.0,1.0)*(ft*(fabs(normal.dot(wt))/pt));
+				return Color( 1.0-Fresnel,1.0-Fresnel,1.0-Fresnel)*(1.0/(indicerefrac*indicerefrac))*(1.0/fabs(cost));//*(indicerefrac*indicerefrac);///fabs(cost)//*(1.0/costt)
+			}
+
+			}
+
+
+		virtual double PDF(const Ray &wi,const registro &rec) override {			
+			if (!refraccion) {
+				return Fresnel;//1.0;//Fresnel;//
+			}else
+			{ 
+				return 1.0-Fresnel;//1.0 - Fresnel;
 			}
 		}
 
-		virtual double PDF(const Ray &wi,const registro &rec) override {
-			
-			return 1.0;
-
-		}
-
-		double F(const double &cosi,const double &cost){
-			double rpar = ((etaT*cosi) - (etaI*cost))/((etaT*cosi) + (etaI*cost));
-			double rper = ((etaI*cosi) - (etaT*cost))/((etaI*cosi) + (etaT*cost));
+		double F(const double &cosi,const double &cost,const double &eT,const double &eI){
+			double rpar = ((eT*cosi) - (eI*cost))/((eT*cosi) + (eI*cost));
+			double rper = ((eI*cosi) - (eT*cost))/((eI*cosi) + (eT*cost));
 			return (rpar*rpar + rper*rper) * 0.5;
 		}
 
@@ -540,11 +547,22 @@ class Dielectrico: public material {
 		double etaT;
 		double Fresnel;
 		double indicerefrac;
+		bool refraccion;
+		Vector normal;
+		double cost;
+		
 };
 
 
 
 #endif
+
+// Vector refraction(const Vector& uv, const Vector& n, double etai_over_etat) {//funcion de refraction de ray tracing in one weekend no funciona adecuadamente
+//     auto cos_theta = fmin(-uv.dot(n), 1.0);
+//     Vector r_out_perp =  (uv + n*cos_theta)* etai_over_etat;
+//     Vector r_out_parallel = n* -sqrt(fabs(1.0 - r_out_perp.magnitud2()))  ;
+//     return r_out_perp + r_out_parallel;
+// }
 //Codigo Basura
 // class MicroFasetC: public material {
 //     public:
@@ -670,3 +688,83 @@ class Dielectrico: public material {
 		double Fresnel;
 	
 };*/
+
+/*Vector refract(const Vector& uv, const Vector& n, double etai_over_etat) {
+    auto cos_theta = fmin(-uv.dot(n), 1.0);
+    Vector r_out_perp =  (uv + n*cos_theta)* etai_over_etat;
+    Vector r_out_parallel = n* -sqrt(fabs(1.0 - r_out_perp.magnitud2()))  ;
+    return r_out_perp + r_out_parallel;
+}
+
+class Dielectrico: public material {
+    public:
+        Dielectrico(const double &a,const double &b) : etaT(a),etaI(b) {}
+
+        virtual bool Rebota(const Ray& wi,Ray& wo,const registro& rec) override{
+
+            return true;
+        }
+		virtual Color BDRF(const Ray& wi, Ray& wo,const registro& rec) override{
+			
+			wo.o=rec.x;
+			Vector v= wi.d*(-1.0);
+			Vector normal= rec.n.dot(v) > 0 ?  rec.n* -1.0: rec.n ;
+			double cosi = (v).dot(rec.n);
+			//cosi = Clamp(cosi, -1, 1);
+			bool entra = cosi > 0.f;
+			if(!entra){
+				swap(etaI, etaT);
+				cosi = fabs(cosi);
+			}
+			indicerefrac = etaI/etaT;
+
+			double sint =indicerefrac * sqrt(max(0.0,1.0 - cosi * cosi));
+			
+
+			if (sint >= 1){
+				wo.d = refleccion(wi.d,normal);
+				return Color();
+			}
+			double cost = sqrt( 1.0 - sint * sint);
+			Fresnel=F(cosi,cost);
+			
+			reflect = random_double() < Fresnel;
+
+		
+			if (reflect){
+				Vector wr = refleccion(v,normal);
+				wr.normalize();
+				double pr = Fresnel;
+				double fr = Fresnel / fabs(cosi);
+				wo.d=wr;
+				return Color(1.0,1.0,1.0)*(fr*(fabs(normal.dot(wr))/pr));
+			}else {
+				Vector wt = ((v*-1.0) * indicerefrac) + normal*(indicerefrac * cosi - cost);
+				wt.normalize();
+				double pt = 1.0 - Fresnel;
+				double ft = (indicerefrac *indicerefrac*(1.0 - Fresnel)) / fabs(cost);
+				wo.d=wt;
+				return Color(1.0,1.0,1.0)*(ft*(fabs(normal.dot(wt))/pt));
+			}
+		}
+
+		virtual double PDF(const Ray &wi,const registro &rec) override {
+			
+			return 1.0;
+
+		}
+
+		double F(const double &cosi,const double &cost){
+			double rpar = ((etaT*cosi) - (etaI*cost))/((etaT*cosi) + (etaI*cost));
+			double rper = ((etaI*cosi) - (etaT*cost))/((etaI*cosi) + (etaT*cost));
+			return (rpar*rpar + rper*rper) * 0.5;
+		}
+
+    public:
+		double etaI;
+		double etaT;
+		double Fresnel;
+		double indicerefrac;
+		bool reflect;
+};*/
+

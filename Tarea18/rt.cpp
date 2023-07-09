@@ -23,6 +23,7 @@ public:
 	material *m;	// Material de la sefera ****Proyecto 2*******
 
 	Sphere(double r_, Point p_,material* m_): r(r_), p(p_), m(m_) {}
+
   
 	double intersect(const Ray &ray) const {
 		Vector oc = ray.o-p;
@@ -31,37 +32,40 @@ public:
 		double b =  oc.dot(ray.d);
 		double c = oc.dot(oc)-r*r;
 		double discriminant= b*b - a*c;
-
-		if (discriminant==0){
-			if (-b>0.0)
-				return -b;
-			else return 0.0;
-
-		}
-		
-		if (discriminant<0) {
+		// regresar distancia si hay intersección
+		// regresar 0.0 si no hay interseccion
+		if (discriminant<0.0) {
 			return 0.0;
 		}
 		else{
 			double tpositivo = -b + sqrt(discriminant);
 			double tnegativo = -b - sqrt(discriminant);
 			double t;
-			if (tpositivo > 0.0 && tnegativo > 0.0 )
+			if (tpositivo > 0.0001 && tnegativo > 0.0001 )
+			{
 			t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
-			else if(tpositivo > 0.0 && tnegativo < 0.0) 
+			}
+			else if(tpositivo >0.0001 && tnegativo < 0.00001) 
+			{
 			t = tpositivo;
-			else if(tpositivo < 0.0 && tnegativo > 0.0)
+			}
+			else if(tpositivo < 0.0001 && tnegativo > 0.00001)
+			{
 			t = tnegativo;
-			else if (tpositivo < 0.0 && tnegativo < 0.0)
-			t=0.0;
-			if (t < 0.001) return 0.0;
-			else return t;
+			}
+			else
+			{
+				t=0;
+			}
+			return t;
+
 		}
+	
 	}
 };
 
 Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
-Conductor Espeq(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+Conductor EsAbaIz(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
 //MicroFasetC EsAbaIz(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803),0.3);//Aluminio
 //MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803),0.3);//Aluminio
 MicroFasetC EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434),0.1);//Oro
@@ -69,7 +73,8 @@ MicroFasetC EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.604
 //Conductor Espeq(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
 //Conductor Esferacristal(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
 //Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
-//Dielectrico Esferacristal(1.5,1.0);
+//double etam=1.5,etai=1.00029;
+Dielectrico Espeq(1.5,1.0);
 
 Difuso ParIzq(Color(.75, .25, .25));//roja
 //Abedo ParDer(Color(.25, .75, .25),0.5);//verde
@@ -81,7 +86,7 @@ Difuso ParedAt(Color(.25, .75, .25));//verde
 Difuso Suelo(Color(.25, .75, .75));//verde bajito
 Difuso Techo(Color(.75, .75, .25));//amarillo
 //Difuso EsAbaIz(Color(.2, .3, .4));//(.2, .3, .4)
-OrenNayar EsAbaIz(Color(.4, .3, .2),0.5);
+//OrenNayar EsAbaIz(Color(.4, .3, .2),0.5);
 //OrenNayar EsAbaDer(Color(.2, .3, .4),0.8);
 
 
@@ -95,10 +100,10 @@ Sphere spheres[] = {
         Sphere(18.5, Point(-23, -22.3, -34.6),   &EsAbaIz), // esfera abajo-izq
 		//Sphere(16.5, Point(-23, -24.3, -34.6),   &Esferaluminoza), // esfera abajo-izq
         //Sphere(18.5, Point(23, -22.3, -30.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
-		Sphere(12.5, Point(23, -28.3, -30.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
-		//Sphere(16.5, Point(23, -24.3, -3.6),     &EsAbaDer), // esfera abajo-der // Para observar las dos fuentes luminosas hay que descomentar esta linea
+		//Sphere(12.5, Point(23, -28.3, -30.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
+		Sphere(16.5, Point(23, -24.3, -3.6),     &EsAbaDer), // esfera abajo-der // Para observar las dos fuentes luminosas hay que descomentar esta linea
         Sphere(10.5, Point(0, 24.3, 0),          &Esferaluminoza), // esfera arriba // esfera iluminada
-		Sphere(7.5, Point(-23.0, -33.5, 30.0),          &Espeq)
+		Sphere(7.5, Point(-23.0, -33.2, 30.0),          &Espeq)
 };
 
 // limita el valor de x a [0,1]
@@ -117,86 +122,138 @@ inline int toDisplayValue(const double x) {
 
 
 inline bool intersect(const Ray &r, double &t, int &id) {
+	double aux;
+	double limite =  100000000000;
+	t = limite;
 	int NS=9;
-	double aux[NS];
 
+	for (int i=0;i < NS;i++) {
+		aux = spheres[i].intersect(r);
 
-	for (int i=0;i<NS;i++){
-        aux[i]=spheres[i].intersect(r);
-		if ( aux[i]>0){
-			t= aux[i];
-			id=i;
-		};
-    };
-
-	for (int i=0;i<NS;i++){
-		if ( t>aux[i] && aux[i]>0.0001 ){
-			t= aux[i];
-			id=i;
-		};
-    };
-	if (t>0){
-		//printf("%f  %d\t ",t,id);
+		if (aux && aux > 0.001 && aux< t) {
+			t = aux;
+			id = i;
+		}
+	}
+	if (t < limite)
 		return true;
-		};
-
-	return false;
+	else 
+		return false;
 }
 
+// inline bool intersect(const Ray &r, double &t, int &id) {
+// 	int NS=8;
+// 	double aux[NS];
 
 
-Color shade(const Ray &r) { /// path traicing interativo sesgo
-	
-	double t; 						 						 
-	int id = 0;	
-	Color attenuation;
-	Ray rebota=r;
+// 	for (int i=0;i<NS;i++){
+//         aux[i]=spheres[i].intersect(r);
+// 		if ( aux[i]>0.001){
+// 			t= aux[i];
+// 			id=i;
+// 		};
+//     };
+
+// 	for (int i=0;i<NS;i++){
+// 		if ( t>aux[i] && aux[i]>0.001 ){
+// 			t= aux[i];
+// 			id=i;
+// 		};
+//     };
+// 	if (t>0){
+// 		//printf("%f  %d\t ",t,id);
+// 		return true;
+// 		};
+
+// 	return false;
+// }
+
+Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una funcion recursiva, esto nos permite lanzar un segundo rayo desde
 	registro rec;
-	Color emite;
-	double q=0.1;
-	double continueprob=1.0-q;
-	double Coseno;
-	double pdf;
+	double t; 						 						 
+	int id = 0;						 
 
-	Color troughpout(1.0,1.0,1.0);
+	if (prof <= 0) // Si ya se ha llegado 
+        return Color();
+
 	if (!intersect(r, t, id)){
 		return Color();
-		}
-	do{			 
+		}	// el rayo no intersecto objeto, return Vector() == negro
 
 	const Sphere &obj = spheres[id];
 
-	rec.x=rebota.d*t+rebota.o; 
+	rec.x=r.d*t+r.o; 
 	rec.n=(rec.x-obj.p).normalize();
 	rec.t=t;
-	
-    emite = obj.m->Emite(rec.x);
 
-	// if (emite.x > 0.0 && emite.y > 0.0 && emite.z > 0.0) {
-	//  	break; 
-	//  }
+    Color emite = obj.m->Emite(rec.x);
 
-    if (!obj.m->Rebota(r, rebota,rec)) {
-		break; 
-	}
-		obj.m->Rebota(r, rebota,rec);
-		pdf=obj.m->PDF(rebota,rec);
-		attenuation=obj.m->BDRF(r,rebota,rec);	
-		Coseno=rec.n.dot(rebota.d);	
-	
-		troughpout=troughpout*attenuation*(fabs(Coseno)/(continueprob*pdf));//
+	Ray rebota;
+	Color attenuation;
 
-	if (random_double()<q) 
-		break;
+    if (!obj.m->Rebota(r, rebota,rec)) 
+        return emite;   
 	
-	if (!intersect(rebota, t, id)){
-		break;
-		}
+	double pdf=obj.m->PDF(rebota,rec);
+	attenuation=obj.m->BDRF(r,rebota,rec);
 
-	}while(true) ;
+	double Coseno=rec.n.dot(rebota.d);
 	
-	return  emite*troughpout;
+	return  emite+ attenuation.mult(shade(rebota, prof-1))*(fabs(Coseno)/pdf);
 }
+
+// Color shade(const Ray &r) { /// path traicing interativo sesgo
+	
+// 	double t; 						 						 
+// 	int id = 0;	
+// 	Color attenuation;
+// 	Ray rebota=r;
+// 	registro rec;
+// 	Color emite;
+// 	double q=0.1;
+// 	double continueprob=1.0-q;
+// 	double Coseno;
+// 	double pdf;
+
+// 	Color troughpout(1.0,1.0,1.0);
+// 	if (!intersect(r, t, id)){
+// 		return Color();
+// 		}
+// 	do{			 
+
+// 	const Sphere &obj = spheres[id];
+
+// 	rec.x=rebota.d*t+rebota.o; 
+// 	rec.n=(rec.x-obj.p).normalize();
+// 	rec.t=t;
+	
+//     emite = obj.m->Emite(rec.x);
+
+// 	// if (emite.x > 0.0 && emite.y > 0.0 && emite.z > 0.0) {
+// 	//  	break; 
+// 	//  }
+
+//     if (!obj.m->Rebota(r, rebota,rec)) {
+// 		break; 
+// 	}
+// 		obj.m->Rebota(r, rebota,rec);
+// 		pdf=obj.m->PDF(rebota,rec);
+// 		attenuation=obj.m->BDRF(r,rebota,rec);	
+// 		Coseno=rec.n.dot(rebota.d);	
+	
+// 		troughpout=troughpout*attenuation*(fabs(Coseno)/(continueprob*pdf));//
+
+// 	if (random_double()<q) 
+// 		break;
+	
+// 	if (!intersect(rebota, t, id)){
+// 		break;
+// 		}
+
+// 	}while(true) ;
+	
+// 	return  emite*troughpout;
+// }
 
 
 
@@ -204,9 +261,9 @@ Color shade(const Ray &r) { /// path traicing interativo sesgo
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
-	double muestras = 64.0;
-	double invMuestras=1.0/muestras;
-	//int prof=10;
+	double muestras = 512.0;
+	double invMuestras=1.0/(muestras);
+	int prof=10;
     clock_t begin = clock();
 
  
@@ -242,7 +299,7 @@ int main(int argc, char *argv[]) {
 			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 			for (int i=0; i<muestras;i++)
 			{
-				pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()))*invMuestras;
+				pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()),prof)*invMuestras;
 			// limitar los tres valores de color del pixel a [0,1] 
 			}
 			//pixelValue = pixelValue;

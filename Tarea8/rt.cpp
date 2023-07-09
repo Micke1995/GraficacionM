@@ -24,8 +24,11 @@ inline double random_double(double min, double max) {
 }
 
 inline double PowerHeuristic(double fPdf, double gPdf) {
-			  double f2 = fPdf * fPdf, g2 = gPdf * gPdf;
-			  return f2 / (f2 + g2);
+			if(fPdf<=0&&gPdf<=0){
+				return 0;
+			} 
+			double f2 = fPdf * fPdf, g2 = gPdf * gPdf;
+			return f2 / (f2 + g2);
 }
 
 
@@ -384,11 +387,11 @@ Color MonteCarloBDRF(const Ray &r,int prof,double &pdf,double &pdf2) {
 	int id = 0;						 
 	
 
-	if (prof <= 0) 
-		//pdf=0.0;
-		//pdf2=0.0;
+	if (prof <= 0){ 
+		pdf=0.0;
+		pdf2=0.0;
         return Color();
-
+}
 	if (!intersect(r, t, id)){
 		return Color();}	
 	const Sphere &obj = spheres[id];
@@ -431,12 +434,13 @@ Color MonteCarloBDRF(const Ray &r,int prof,double &pdf,double &pdf2) {
 
 
 Color MonteCarloLuz(const Ray &r,int prof,double &pdf,double &pdf2) { 
-	double t; 						 
-	double h;						
+	double t; 						 						
 	int id = 0;						
-	if (prof <= 0)  
+	if (prof <= 0){
+		pdf=0;
+		pdf2=0;  
         return Color();
-
+}
 	if (!intersect(r, t, id)){
 
 		return Color();}	
@@ -478,11 +482,21 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 	Color bdrf=MonteCarloBDRF(r,2,pdfdrf1,pdfdrf2);
 	Color luz=MonteCarloLuz(r,2,pdfl1,pdfl2);
 
-	double w1=PowerHeuristic(pdfl1,pdfl2);
-	double w2=PowerHeuristic(pdfdrf1,pdfdrf2);
-	//printf("%f,%f\n",w1,w2);
 
-	return  luz*w1+ bdrf*w2;
+	
+	double w1=PowerHeuristic(pdfl2,pdfl1);
+	double w2=PowerHeuristic(pdfdrf2,pdfdrf1);
+	printf("%f,%f\n",w1,w2);
+	//printf("%f,%f,%f,\n",pdfdrf1,pdfdrf2,w2);
+	if (w2 < 0.0001){
+		return luz;
+	}
+	if (w1 < 0.0001){
+		return bdrf;
+	}
+	if (w1 > 0.0001 && w2 > 0.0001){
+	return  bdrf*w2+luz*w1;
+	}
 	
 
 }
@@ -551,7 +565,7 @@ int main(int argc, char *argv[]) {
 
 	// PROYECTO 1
 	// Investigar formato ppm
-	FILE *f = fopen("MIS.ppm", "w");
+	FILE *f = fopen("Luz.ppm", "w");
 	// escribe cabecera del archivo ppm, ancho, alto y valor maximo de color
 	fprintf(f, "P3\n%d %d\n%d\n", w, h, 255); 
 	for (int p = 0; p < w * h; p++) 
