@@ -4,92 +4,27 @@
 #include <stdlib.h>
 #include <stdio.h>  
 #include <omp.h>
-#include <stdio.h>
+#include <utility>
 #include <time.h>       // for clock_t, clock(), CLOCKS_PER_SEC
-#define NUM_THREADS 4
+//#define NUM_THREADS 12
 #include <cstdlib>
+#include <cmath>
+#include<algorithm>
+using namespace std;
+#include "material.h"
 
 
-inline double random_double() {
-    // Returns a random real in [0,1).
-    return rand() / (RAND_MAX + 1.0);
-}
-
-inline double random_double(double min, double max) {
-    // Returns a random real in [min,max).
-    return min + (max-min)*random_double();
-}
-
-
-class Vector 
-{
-public:        
-	double x, y, z; // coordenadas x,y,z 
-  
-	// Constructor del vector, parametros por default en cero
-	Vector(double x_= 0, double y_= 0, double z_= 0){ x=x_; y=y_; z=z_; }
-  
-	// operador para suma y resta de vectores
-	Vector operator+(const Vector &b) const { return Vector(x + b.x, y + b.y, z + b.z); }
-	Vector operator-(const Vector &b) const { return Vector(x - b.x, y - b.y, z - b.z); }
-	// operator multiplicacion vector y escalar 
-	Vector operator*(double b) const { return Vector(x * b, y * b, z * b); }
-
-	// operator % para producto cruz
-	Vector operator%(Vector&b){return Vector(y * b.z - z * b.y, z * b.x - x * b.z, x * b.y - y * b.x);}
-	
-	// producto punto con vector b
-	double dot(const Vector &b) const { return x * b.x + y * b.y + z * b.z; }
-
-	// producto elemento a elemento (Hadamard product)
-	Vector mult(const Vector &b) const { return Vector(x * b.x, y * b.y, z * b.z); }
-	
-	// normalizar vector 
-	Vector& normalize(){ return *this = *this * (1.0 / sqrt(x * x + y * y + z * z)); }
-
-};
-
-
-typedef Vector Point;
-typedef Vector Color;
-
-inline  Vector cross(const Vector &u, const Vector &v) {
-    return Vector(u.y * v.z - u.z * v.y,
-                u.z * v.x - u.x * v.z,
-                u.x * v.y - u.y * v.x);
-}
-
-void coordinateSystem(const Vector &n, Vector &s, Vector &t) {
-	if (std::abs(n.x) > std::abs(n.y)) {
-		float invLen = 1.0f / std::sqrt(n.x * n.x + n.z * n.z);
-		t = Vector(n.z * invLen, 0.0f, -n.x * invLen);
-	} else {
-		float invLen = 1.0f / std::sqrt(n.y * n.y + n.z * n.z);
-		t = Vector(0.0f, n.z * invLen, -n.y * invLen);
-	}
-	s = cross(t, n);
-	}
-
-
-class Ray 
-{ 
-public:
-	Point o;
-	Vector d; // origen y direcccion del rayo
-	Ray(Point o_, Vector d_) : o(o_), d(d_) {} // constructor
-};
 
 class Sphere 
 {
 public:
 	double r;	// radio de la esfera
-	Point p;	// posicion
-	Color c;	// color  
+	Point p;	// posicion 
+	material *m;	// Material de la sefera ****Proyecto 2*******
 
-	Sphere(double r_, Point p_, Color c_): r(r_), p(p_), c(c_) {}
+	Sphere(double r_, Point p_,material* m_): r(r_), p(p_), m(m_) {}
+
   
-	// PROYECTO 1
-	// determina si el rayo intersecta a esta esfera
 	double intersect(const Ray &ray) const {
 		Vector oc = ray.o-p;
 
@@ -99,25 +34,76 @@ public:
 		double discriminant= b*b - a*c;
 		// regresar distancia si hay intersección
 		// regresar 0.0 si no hay interseccion
-		if (discriminant<0) {
+		if (discriminant<0.0) {
 			return 0.0;
 		}
 		else{
-			return (-b-sqrt(discriminant)/a);
+			double tpositivo = -b + sqrt(discriminant);
+			double tnegativo = -b - sqrt(discriminant);
+			double t;
+			if (tpositivo > 0.0001 && tnegativo > 0.0001 )
+			{
+			t = (tpositivo < tnegativo) ? tpositivo : tnegativo;
+			}
+			else if(tpositivo >0.0001 && tnegativo < 0.00001) 
+			{
+			t = tpositivo;
+			}
+			else if(tpositivo < 0.0001 && tnegativo > 0.00001)
+			{
+			t = tnegativo;
+			}
+			else
+			{
+				t=0;
+			}
+			return t;
+
 		}
+	
 	}
 };
 
+Luz  Esferaluminoza(Color(10.0, 10.0, 10.0));
+Conductor EsAbaIz(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803));//Aluminio
+//MicroFasetC EsAbaIz(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803),0.3);//Aluminio
+//MicroFasetC EsAbaDer(Color(1.66058,0.88143,0.531467),Color(9.2282,6.27077,4.83803),0.3);//Aluminio
+MicroFasetC EsAbaDer(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434),0.1);//Oro
+//MicroFasetC EsAbaIz(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434),0.3);//Oro
+//Conductor Espeq(Color(0.143245,0.377423,1.43919),Color(3.98478,2.3847,1.60434));//Oro
+//Conductor Esferacristal(Color(0.208183,0.919438,1.110241),Color(3.92198,2.45627,2.14157));//Cobre
+//Luz  Esferaluminoza(Color(1.0, 1.0, 1.0));
+//double etam=1.5,etai=1.00029;
+Dielectrico Espeq(1.5,1.0);
+
+Difuso ParIzq(Color(.75, .25, .25));//roja
+//Abedo ParDer(Color(.25, .75, .25),0.5);//verde
+Difuso ParDer(Color(.25, .25, .75));//azul
+//Abedo ParedAt(Color(1.0, 1.0, 1.0),0.5);//blanco
+//Abedo Suelo(Color(1.0, 1.0, 1.0),0.5);//blanco
+//Abedo Techo(Color(1.0, 1.0, 1.0),0.5);//blanco
+Difuso ParedAt(Color(.25, .75, .25));//verde
+Difuso Suelo(Color(.25, .75, .75));//verde bajito
+Difuso Techo(Color(.75, .75, .25));//amarillo
+//Difuso EsAbaIz(Color(.2, .3, .4));//(.2, .3, .4)
+//OrenNayar EsAbaIz(Color(.4, .3, .2),0.5);
+//OrenNayar EsAbaDer(Color(.2, .3, .4),0.8);
+
+
 Sphere spheres[] = {
-	//Escena: radio, posicion, color 
-	Sphere(1e5,  Point(-1e5 - 49, 0, 0),   Color(.75, .25, .25)), // pared izq
-	Sphere(1e5,  Point(1e5 + 49, 0, 0),    Color(.25, .25, .75)), // pared der
-	Sphere(1e5,  Point(0, 0, -1e5 - 81.6), Color(.75, .75, .75)), // pared detras
-	Sphere(1e5,  Point(0, -1e5 - 40.8, 0), Color(.75, .75, .75)), // suelo
-	Sphere(1e5,  Point(0, 1e5 + 40.8, 0),  Color(.75, .75, .75)), // techo
-	Sphere(16.5, Point(-23, -24.3, -34.6), Color(.999, .999, .999)), // esfera abajo-izq
-	Sphere(16.5, Point(23, -24.3, -3.6),   Color(.999, .999, .999) ), // esfera abajo-der
-	Sphere(10.5, Point(0, 24.3, 0),        Color(1, 1, 1)) // esfera arriba	
+	//Escena: radio, posicion ,material    //Fara facilitarme las cosas quite el Color, y se lo agregue en el material.
+        Sphere(1e5,  Point(-1e5 - 49, 0, 0),     &ParIzq), // pared izq
+        Sphere(1e5,  Point(1e5 + 49, 0, 0),      &ParDer), // pared der
+        Sphere(1e5,  Point(0, 0, -1e5 - 81.6),   &ParedAt), // pared detras
+        Sphere(1e5,  Point(0, -1e5 - 40.8, 0),   &Suelo), // suelo
+        Sphere(1e5,  Point(0, 1e5 + 40.8, 0),    &Techo), // techo
+        Sphere(18.5, Point(-23, -22.3, -34.6),   &EsAbaIz), // esfera abajo-izq
+		//Sphere(16.5, Point(-23, -24.3, -34.6),   &Esferaluminoza), // esfera abajo-izq
+        //Sphere(18.5, Point(23, -22.3, -30.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
+		//Sphere(12.5, Point(23, -28.3, -30.6),     &EsAbaDer), // esfera abajo-der// Para observar las dos fuentes luminosas hay que comentar esta linea
+		Sphere(16.5, Point(23, -24.3, -3.6),     &EsAbaDer), // esfera abajo-der // Para observar las dos fuentes luminosas hay que descomentar esta linea
+        Sphere(10.5, Point(0, 24.3, 0),          &Esferaluminoza), // esfera arriba // esfera iluminada
+		Sphere(7.5, Point(-23.0, -33.2, 30.0),          &Espeq)
 };
 
 // limita el valor de x a [0,1]
@@ -134,82 +120,152 @@ inline int toDisplayValue(const double x) {
 	return int( pow( clamp(x), 1.0/2.2 ) * 255 + .5); 
 }
 
-// PROYECTO 1
-// calcular la intersección del rayo r con todas las esferas
-// regresar true si hubo una intersección, falso de otro modo
-// almacenar en t la distancia sobre el rayo en que sucede la interseccion
-// almacenar en id el indice de spheres[] de la esfera cuya interseccion es mas cercana
+
 inline bool intersect(const Ray &r, double &t, int &id) {
-	int NS=8;
-	double aux[NS];
+	double aux;
+	double limite =  100000000000;
+	t = limite;
+	int NS=9;
 
+	for (int i=0;i < NS;i++) {
+		aux = spheres[i].intersect(r);
 
-	for (int i=0;i<NS;i++){
-        aux[i]=spheres[i].intersect(r);
-		if ( aux[i]>0){
-			t= aux[i];
-			id=i;
-		};
-
-    };
-
-	for (int i=0;i<NS;i++){
-		if ( t>aux[i] && aux[i]>1. ){
-			t= aux[i];
-			id=i;
-		};
-    };
-	if (t>0){
-		//printf("%f  %d\t ",t,id);
+		if (aux && aux > 0.001 && aux< t) {
+			t = aux;
+			id = i;
+		}
+	}
+	if (t < limite)
 		return true;
-		};
-
-	return false;
+	else 
+		return false;
 }
 
-// Calcula el valor de color para el rayo dado
-Color shade(const Ray &r) {
-	double t;
-	double h;
-	int id = 0;
-	// determinar que esfera (id) y a que distancia (t) el rayo intersecta
+// inline bool intersect(const Ray &r, double &t, int &id) {
+// 	int NS=8;
+// 	double aux[NS];
+
+
+// 	for (int i=0;i<NS;i++){
+//         aux[i]=spheres[i].intersect(r);
+// 		if ( aux[i]>0.001){
+// 			t= aux[i];
+// 			id=i;
+// 		};
+//     };
+
+// 	for (int i=0;i<NS;i++){
+// 		if ( t>aux[i] && aux[i]>0.001 ){
+// 			t= aux[i];
+// 			id=i;
+// 		};
+//     };
+// 	if (t>0){
+// 		//printf("%f  %d\t ",t,id);
+// 		return true;
+// 		};
+
+// 	return false;
+// }
+
+Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una funcion recursiva, esto nos permite lanzar un segundo rayo desde
+	registro rec;
+	double t; 						 						 
+	int id = 0;						 
+
+	if (prof <= 0) // Si ya se ha llegado 
+        return Color();
+
 	if (!intersect(r, t, id)){
-		return Color();}	// el rayo no intersecto objeto, return Vector() == negro
+		return Color();
+		}	// el rayo no intersecto objeto, return Vector() == negro
 
 	const Sphere &obj = spheres[id];
+
+	rec.x=r.d*t+r.o; 
+	rec.n=(rec.x-obj.p).normalize();
+	rec.t=t;
+
+    Color emite = obj.m->Emite(rec.x);
+
+	Ray rebota;
+	Color attenuation;
+
+    if (!obj.m->Rebota(r, rebota,rec)) 
+        return emite;   
 	
-	// PROYECTO 1
-	// determinar coordenadas del punto de interseccion
-	Point x; //Linea de codigo para el calculo de las coordenadas 
-	x=r.d*t+r.o;
-	//h=sqrt(x.x*x.x+x.y*x.y+x.z*x.z)/103.5; //esta linea no se utilizo
+	double pdf=obj.m->PDF(rebota,rec);
+	attenuation=obj.m->BDRF(r,rebota,rec);
+
+	double Coseno=rec.n.dot(rebota.d);
 	
-	// determinar la dirección normal en el punto de interseccion
-	Vector n;
-	n=x-obj.p;
-	n.normalize();
-
-	//Imagen2.jpg Es necesario descomentar la siguiente linea de codigo para obtener lo equivalente a esta imangen.
-	//Color colorvalue(obj.c+n);// Para pintar las esferas de acuerdo a la normal en su punto intersectado
-
-	//Imagen.jpg Es necesario descomentar la siguiente linea de codigo para obtener lo equivalente a esta imangen.
-	//Color colorvalue(obj.c);// Para pintar las esferas de acuerdo a su color 
-
-	//Imagen3.jpg Es necesario descomentar la siguiente linea de codigo para obtener lo equivalente a esta imangen.
-	Color colorvalue((1/310.0)*t,(1/310.0)*t,(1/310.0)*t); //Para pintarlo deacuerdo a la distancia
-
-	//Posible variante para la Imagen3.jpg
-	//Color colorvalue(1*h,1*h,1*h);//Para pintarlo deacuerdo a la distancia, es redundante y no funciona bien, hay que descomentar h para probarlo
-
-	return colorvalue; 
+	return  emite+ attenuation.mult(shade(rebota, prof-1))*(fabs(Coseno)/pdf);
 }
+
+// Color shade(const Ray &r) { /// path traicing interativo sesgo
+	
+// 	double t; 						 						 
+// 	int id = 0;	
+// 	Color attenuation;
+// 	Ray rebota=r;
+// 	registro rec;
+// 	Color emite;
+// 	double q=0.1;
+// 	double continueprob=1.0-q;
+// 	double Coseno;
+// 	double pdf;
+
+// 	Color troughpout(1.0,1.0,1.0);
+// 	if (!intersect(r, t, id)){
+// 		return Color();
+// 		}
+// 	do{			 
+
+// 	const Sphere &obj = spheres[id];
+
+// 	rec.x=rebota.d*t+rebota.o; 
+// 	rec.n=(rec.x-obj.p).normalize();
+// 	rec.t=t;
+	
+//     emite = obj.m->Emite(rec.x);
+
+// 	// if (emite.x > 0.0 && emite.y > 0.0 && emite.z > 0.0) {
+// 	//  	break; 
+// 	//  }
+
+//     if (!obj.m->Rebota(r, rebota,rec)) {
+// 		break; 
+// 	}
+// 		obj.m->Rebota(r, rebota,rec);
+// 		pdf=obj.m->PDF(rebota,rec);
+// 		attenuation=obj.m->BDRF(r,rebota,rec);	
+// 		Coseno=rec.n.dot(rebota.d);	
+	
+// 		troughpout=troughpout*attenuation*(fabs(Coseno)/(continueprob*pdf));//
+
+// 	if (random_double()<q) 
+// 		break;
+	
+// 	if (!intersect(rebota, t, id)){
+// 		break;
+// 		}
+
+// 	}while(true) ;
+	
+// 	return  emite*troughpout;
+// }
+
+
+
 
 
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
-	int muestras=100;
+	double muestras = 512.0;
+	double invMuestras=1.0/(muestras);
+	int prof=10;
     clock_t begin = clock();
-	//sleep(3);
+
  
 	int w = 1024, h = 768; // image resolution
   
@@ -223,12 +279,12 @@ int main(int argc, char *argv[]) {
 	// auxiliar para valor de pixel y matriz para almacenar la imagen
 	Color *pixelColors = new Color[w * h];
 
-	// PROYECTO 1
-	// usar openmp para paralelizar el ciclo: cada hilo computara un renglon (ciclo interior),
-
+	int NUM_THREADS=omp_get_max_threads();
+	fprintf(stderr," \r Vamos a trabajar con %d hilos \n",NUM_THREADS);
 	omp_set_num_threads(NUM_THREADS); //Lineas de Codigo para paralelizar
-	#pragma omp parallel for //schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
-
+	#pragma omp parallel
+	{ //for // schedule(dynamic,1) //Con la paralelizacion se reduce en un 60 % aproxiamadamente el tiempo de ejecucion.
+	#pragma omp for //schedule(dynamic,1)
 	for(int y = 0; y < h; y++) 
 	{ 
 		// recorre todos los pixeles de la imagen
@@ -239,18 +295,14 @@ int main(int argc, char *argv[]) {
 
 			Color pixelValue = Color(); // pixelValue en negro por ahora
 			// para el pixel actual, computar la dirección que un rayo debe tener
+			Vector cameraRayDir = cx * ( double(x)/w - .5) + cy * ( double(y)/h - .5) + camera.d;
+			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 			for (int i=0; i<muestras;i++)
 			{
-			auto X = cx * (double( x + random_double())/w-0.5);
-			auto Y = cy * (double( y + random_double())/h-0.5);	
-			Vector cameraRayDir = X + Y + camera.d; 
-			// computar el color del pixel para el punto que intersectó el rayo desde la camara
-
-			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()) );
+				pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()),prof)*invMuestras;
 			// limitar los tres valores de color del pixel a [0,1] 
 			}
-			auto escala = 1.0/muestras;
-			pixelValue = pixelValue*escala;
+			//pixelValue = pixelValue;
 
 			pixelColors[idx] = Color(clamp(pixelValue.x), clamp(pixelValue.y), clamp(pixelValue.z));
 		}
@@ -259,7 +311,7 @@ int main(int argc, char *argv[]) {
 	
 	}
 
-
+}
 	fprintf(stderr,"\n");
 	clock_t end = clock();
 
@@ -269,7 +321,7 @@ int main(int argc, char *argv[]) {
 
 	// PROYECTO 1
 	// Investigar formato ppm
-	FILE *f = fopen("Antialiasing3.ppm", "w");
+	FILE *f = fopen("Dielectrica.ppm", "w");
 	// escribe cabecera del archivo ppm, ancho, alto y valor maximo de color
 	fprintf(f, "P3\n%d %d\n%d\n", w, h, 255); 
 	for (int p = 0; p < w * h; p++) 

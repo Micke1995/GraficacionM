@@ -339,6 +339,8 @@ Sphere spheres[] = {
 
 };
 
+Sphere Luces[]={Sphere(10.5, Point(0, 24.3, 0), &Esferaluminoza)};
+
 // limita el valor de x a [0,1]
 inline double clamp(const double x) { 
 	if(x < 0.0)
@@ -388,17 +390,18 @@ Color MonteCarloBDRF(const Ray &r,int prof,double &pdf,double &pdf2) {
 	
 
 	if (prof <= 0){ 
-		pdf=0.0;
-		pdf2=0.0;
+			pdf=0.0;
+			pdf2=0.0;
         return Color();
 }
 	if (!intersect(r, t, id)){
-		return Color();}	
+		return Color();
+		}	
 	const Sphere &obj = spheres[id];
 
+	const Sphere &luz = Luces[0];//Aqui en lugar de zero podria poner un numero aleatorio entero entre las luces que hay osea 0 y 4  etc.
 	Point x=r.d*t+r.o; 
-	double radio=10.5; 
-	Vector luz(0, 24.3,0);
+
 
 	Vector n=(x-obj.p).normalize();
 	Vector s; 
@@ -414,17 +417,18 @@ Color MonteCarloBDRF(const Ray &r,int prof,double &pdf,double &pdf2) {
 
 
     if (!obj.m->Rebota(r, attenuation,rebota)){
-		double Distancia=rebota.d.magnitud2();
-		Vector n2=(rebota.d-luz).normalize();
-		double cosenoluz=n2.z;
-		pdf2=Distancia/(4.0*pi*radio*radio*cosenoluz);
+			double Distancia=rebota.d.magnitud2();
+			Vector n2=(rebota.d-luz.p).normalize();
+			double cosenoluz=n2.z;
+			pdf2=Distancia/(4.0*pi*luz.r*luz.r*cosenoluz);
+			//printf("%f\n",pdf2);
         return emite;
 		}
 	Point dir(re.dot(Point(s.x,ti.x,n.x)),re.dot(Point(s.y,ti.y,n.y)),re.dot(Point(s.z,ti.z,n.z)));
 
     rebota=Ray(x,dir.normalize());
 
-	double Coseno=n.dot(dir.normalize());//
+	double Coseno=fabs(n.dot(dir.normalize()));//
 	pdf=(1.0/pi)*re.z;
 	
 
@@ -442,16 +446,15 @@ Color MonteCarloLuz(const Ray &r,int prof,double &pdf,double &pdf2) {
         return Color();
 }
 	if (!intersect(r, t, id)){
-
-		return Color();}	
+		return Color();
+		}	
 	const Sphere &obj = spheres[id];
 	Point x=r.d*t+r.o; 
 	Vector n=(x-obj.p).normalize();
-	double radio=10.5; 
-	Vector luz(0, 24.3,0);
+	const Sphere &luz = Luces[0];
 
-    Vector dir=luz+random_esfera2(radio);
-	Vector n2=(dir-luz).normalize();	
+    Vector dir=luz.p+random_esfera2(luz.r);
+	Vector n2=(dir-luz.p).normalize();	
 	dir=dir-x;	
 	double Distancia=(dir).magnitud2();
 	double cosenoluz=n2.z;
@@ -461,14 +464,15 @@ Color MonteCarloLuz(const Ray &r,int prof,double &pdf,double &pdf2) {
 	double Coseno=n.dot(dir);
 	if (Coseno  <= 0)
         return emite;
-
+	if (cosenoluz<0.0001)
+		return emite;
 
 	
-    if (!obj.m->Rebota(r, attenuation,rebota)||cosenoluz<=0.001){ //
-			pdf2=0.5*r.d.z;
+    if (!obj.m->Rebota(r, attenuation,rebota)){ //
+			pdf2=(1.0/pi)*r.d.z;
 			return emite;
 		} 		
-	pdf=Distancia/(4.0*pi*radio*radio*cosenoluz);						 
+	pdf=Distancia/(4.0*pi*luz.r*luz.r*cosenoluz);						 
     return emite + attenuation.mult(MonteCarloLuz(rebota, prof-1,pdf,pdf2))*(fabs(Coseno)/pdf); 
 }
 
@@ -481,23 +485,22 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 
 	Color bdrf=MonteCarloBDRF(r,2,pdfdrf1,pdfdrf2);
 	Color luz=MonteCarloLuz(r,2,pdfl1,pdfl2);
-
-
 	
-	double w1=PowerHeuristic(pdfl2,pdfl1);
+	double w1=PowerHeuristic(pdfl1,pdfl2);
 	double w2=PowerHeuristic(pdfdrf2,pdfdrf1);
-	printf("%f,%f\n",w1,w2);
+	// printf("%f,%f\n",w1,w2);
 	//printf("%f,%f,%f,\n",pdfdrf1,pdfdrf2,w2);
-	if (w2 < 0.0001){
-		return luz;
-	}
-	if (w1 < 0.0001){
-		return bdrf;
-	}
-	if (w1 > 0.0001 && w2 > 0.0001){
-	return  bdrf*w2+luz*w1;
-	}
-	
+	// if (w2 <= 0){
+	//  	return luz;
+	//  }
+	// if (w1 <=0){
+	// 	return bdrf;
+	// }
+	// if (w1 > 0 && w2 > 0){
+		//printf("%f,%f\n",w1,w2);
+	return  luz*w1+bdrf*w2;
+	// }
+	return Color();
 
 }
 

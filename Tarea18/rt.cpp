@@ -335,3 +335,84 @@ int main(int argc, char *argv[]) {
 
 	return 0;
 }
+// Color puntual2(const Ray &r,registro &rec,const int &id) { 
+
+
+// 	const Sphere &obj = spheres[id];
+
+
+// 	Point luz(0, 24.3,0);// Creamos la fuente puntual, en este caso es la direccion a la que vamos a muestrear, como este punto ya esta en coordenadas
+
+//     Color attenuation;
+// 	Vector x1=(rec.x-luz); //Creamos la direccion en la que va nuestra el rayo de luz, en la ecuacion Le(x',-wi) x'
+// 	Ray rebota(luz,x1); 
+
+// 	Color emite(5000,5000,5000);
+
+
+// 	double ta;
+// 	int id2=0;
+// 	double dist=0;
+// 	if (!intersect(rebota, ta, id2)){//lanzamos nuevamente el rayo pero ahora desde la luz hacia la esfera. Si no toca nada regresamos negro.
+// 		return Color();
+// 	}
+
+// 	const Sphere &obj2 = spheres[id2];
+// 	Point x2=rebota.d*ta+rebota.o;
+
+
+
+// 	if(obj2.m->Rebota(r,rebota,rec)){//Si la esfera que tocamos la primera vez es igual a la esfera que tocamos la segunda vez regresamos color si no no regresamos nada
+		
+// 	//return emite*(1.0/dist);
+// 	return Color();
+// 		}else{
+// 			dist=(luz-x2).magnitud();
+// 			return emite*(1.0/dist);
+// }
+		
+    
+
+
+    
+
+// }
+
+// Color Area(const Ray &r,registro &rec,const int &id) { //,const registro &rec
+
+// 	const Sphere &obj = spheres[id];
+// 	rec.n=(rec.x-obj.p).normalize();
+
+// 	double radio=10.5; 
+// 	Vector luz(0, 24.3,0);
+//     double costmax;
+
+//     Vector w=luz-rec.x;
+//     Vector re=random_asolido(w,radio,costmax).normalize();
+// 	w.normalize();
+
+// 	Vector s; 
+// 	Vector ti;
+// 	coordinateSystem(w,s,ti);
+// 	Vector dir(s*re.x+ti*re.y+w*re.z);
+// 	dir.normalize();
+
+//     Ray rebota(rec.x,dir);
+
+// 	double pw=1.0 / (2.0 * pi * (1.0 - costmax));
+	
+// 	double ta; 
+// 	int id2;
+// 		if (!intersect(rebota, ta, id2)){
+// 		return Color();
+// 		}
+
+// 	const Sphere &obj2 = spheres[id2];
+
+// 	Color emite2 = obj2.m->Emite(rec.x);
+
+//     if (!obj2.m->Rebota(r, rebota,rec)) 
+//     return emite2*(1/pw); 
+// 	else return Color();
+
+// }

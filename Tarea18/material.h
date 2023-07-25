@@ -490,7 +490,6 @@ class Dielectrico: public material {////// Tarea 18/////////////////
 		 		return false;
 			}
 			cost = sqrt( 1.0 - sint * sint);
-			double rpar,rper;
 
 
 			// Fresnel= entra ? F(cost,cosi, etaT, etaI) : F(cost,cosi, etaI, etaT);

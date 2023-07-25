@@ -281,8 +281,8 @@ class Abedo : public material {
 			}
 
 
-			atenuacion = albedo*(1.0/pi)*(A+B);
-			//atenuacion = albedo*(1.0/pi);
+			//atenuacion = albedo*(1.0/pi)*(A+B);
+			atenuacion = albedo*(1.0/pi);
             return true;
         }
     public:
@@ -404,16 +404,62 @@ inline bool intersect(const Ray &r, double &t, int &id) {
 	return false;
 }
 
+Color AnguloSolido(const Ray &r,int prof,int uz) { //Agregamos la profundidad para hacer una funcion recursiva, esto nos permite lanzar un segundo rayo desde
+	double t; 						 // donde intersecta nuestro primer rayo si es que intersecta, si consideramos la profunidad mayor que 2
+    int id = 0;      			     // y si pensamos que en lugar de un segundo rayo es un rebote del rayo original, podriamos decir que con una
+									 // profundidad n podemos calcular como el rayo rebota n veces.
+	// determinar que esfera (id) y a que distancia (t) el rayo intersecta
+
+	if (prof <= 0) // Si ya se ha llegado 
+        return Color();
+
+	if (!intersect(r, t, id)){
+		return Color();}	// el rayo no intersecto objeto, return Vector() == negro
+
+	const Sphere &obj = spheres[id];
+
+	// PROYECTO 2
+	Point x=r.d*t+r.o; //Linea de codigo para el calculo de las coordenadas
+	// determinar la dirección normal en el punto de interseccion
+	Vector n=(x-obj.p).normalize();
+
+	double radio=10.5; 
+	Vector luz(0, 24.3,0);
+    double costmax;
+
+    Vector w=luz-x;
+    Vector re=random_asolido(w,radio,costmax).normalize();
+	w.normalize();
+
+	Vector s; 
+	Vector ti;
+	coordinateSystem(w,s,ti);
+	Vector dir(s*re.x+ti*re.y+w*re.z);
+	dir.normalize();
+
+
+	double Coseno=n.dot(dir);
+    Ray rebota(x,dir);
+    Color attenuation ;
+    Color emite = obj.m->Emite(x);
+    
+	if (Coseno  < 0)
+        return emite;
+
+    if (!obj.m->Rebota(r, attenuation,rebota) && uz ==1) //Si el objeto es un emisor regresa el emisor, pero solo la primera vez
+        return emite;   
+
+	double pw=1.0 / (2.0 * pi * (1.0 - costmax));
+
+    return emite + attenuation.mult(shade(rebota, prof-1))*(Coseno/(pw)); //pdf*
+
+}
 
 
 
 Color shade(const Ray &r,int uz) {
 	double t; 						 
     int id = 0;      			    
-
-
-	//if (prof <= 0) // Si ya se ha llegado 
-    //    return Color();
 
 	if (!intersect(r, t, id)){
 		return Color();}	// el rayo no intersecto objeto, return Vector() == negro
@@ -457,8 +503,11 @@ Color shade(const Ray &r,int uz) {
 	Point x2=rebota.d*t2+rebota.o; 
 	Color emite2 = obj2.m->Emite(x2);
 	Color LD; 
-    if (!obj2.m->Rebota(r, attenuation,rebota)){ //
-			LD = attenuation.mult(emite2)*(fabs(Coseno)/pw);
+
+	//if (Coseno  < 0)
+	
+    if (!obj2.m->Rebota(r, attenuation,rebota) && Coseno>0){ 
+			LD = LD+ attenuation.mult(emite2)*(fabs(Coseno)/pw);
 		} 
 
 	double theta;
@@ -469,7 +518,7 @@ Color shade(const Ray &r,int uz) {
 
 	Point dir2(re2.dot(Point(s2.x,ti2.x,n.x)),re2.dot(Point(s2.y,ti2.y,n.y)),re2.dot(Point(s2.z,ti2.z,n.z)));
     Ray rebota2(x,dir2.normalize());
-	double pdf2=(1.0/pi)*cos(theta);
+	double pdf2=(1.0/pi)*re2.z;
 	double Coseno2 = n.dot(dir2);
 	double q = 0.3;
 	double continueprob = 1.0 - q;
@@ -488,7 +537,7 @@ Color shade(const Ray &r,int uz) {
 int main(int argc, char *argv[]) {
 	double time_spent = 0.0;
 	double muestras= 128.0;
-	//int prof=10;
+	int prof=2;
     clock_t begin = clock();
 	//sleep(3);
 
@@ -525,7 +574,7 @@ int main(int argc, char *argv[]) {
 			Vector cameraRayDir = cx * ( double(x)/w - .5) + cy * ( double(y)/h - .5) + camera.d;
 			// computar el color del pixel para el punto que intersectó el rayo desde la camara
 
-			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()),1)*(1.0/muestras);
+			pixelValue = pixelValue + shade( Ray(camera.o, cameraRayDir.normalize()),2)*(1.0/muestras);
 			// limitar los tres valores de color del pixel a [0,1] 
 			}
 			//pixelValue = pixelValue;

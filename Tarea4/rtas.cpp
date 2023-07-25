@@ -339,11 +339,6 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
 	Vector dir(s*re.x+ti*re.y+w*re.z);
 	dir.normalize();
 
-	/*Vector v;
-    Vector u;
-    ortonormalSystem(w,v,u); // Este sistema ortonormal es de raytraicing in one weekend, sirve igual si lo haces bien.
-	Vector dir=v*re.x+u*re.y+w*re.z;*/
-
 	double Coseno=n.dot(dir);
     Ray rebota(x,dir);
     Color attenuation ;
@@ -356,6 +351,7 @@ Color shade(const Ray &r,int prof) { //Agregamos la profundidad para hacer una f
         return emite;  
 
 	double pw=1.0 / (2.0 * pi * (1.0 - costmax));
+	printf("%f\n",pw);
 
     return emite + attenuation.mult(shade(rebota, prof-1))*(Coseno/(pw)); //pdf*
 
